@@ -315,6 +315,8 @@ private fun PerformancePage() {
 
 @Composable
 private fun ExtrasPage() {
+    gb.frame.AppLanguageSettings()
+    Spacer(Modifier.height(12.dp))
     RetroAchievementsSettings("GBSat")
 }
 

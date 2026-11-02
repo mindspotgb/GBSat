@@ -5,6 +5,7 @@ import android.app.Application
 class GBSatApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        gb.frame.AppLanguage.applyProcessLocale(this)
         gb.frame.LauncherIconCompatibility.apply(
             this,
             "app.gbsat.emulator.BitmapLauncherActivity",

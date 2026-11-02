@@ -7,6 +7,7 @@ import gb.frame.HotkeyAction
 import gb.frame.Hotkeys
 import gb.frame.HomeTheme
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -35,6 +36,10 @@ class MainActivity : ComponentActivity() {
     // Remember whether gameplay was active before Android backgrounds the activity.
     // Emulator.paused is set to true below, so the pre-pause state must be captured first.
     private var resumeGameplayAfterForeground = false
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(gb.frame.AppLanguage.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
