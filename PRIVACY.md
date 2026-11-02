@@ -1,10 +1,8 @@
 # GBSat — Privacy Policy
 
-_Last updated: November 1, 2026_
+_Last updated: November 2, 2026_
 
-GBSat is a Sega Saturn emulator for Android. This policy explains what data the app handles. **The developer does not
-receive personal data from the app.** There are no ads, analytics or tracking. Google Play handles payment for the
-optional visual customization purchase described below.
+GBSat is a Sega Saturn emulator for Android. This policy explains what data the app handles. GBSat has no ads, analytics or tracking. If you choose to buy or restore Gold, the app sends a Google Play purchase token, app and product IDs, and Android ID to the GameBeacon license service to verify and record the license. Google Play handles payment; the developer does not receive your payment credentials, Google account password, or account email.
 
 ## Data stored on your device
 
@@ -58,3 +56,7 @@ Changes to this policy are published in this file, in the GBSat source repositor
 ## Contact
 
 Questions: open an issue at <https://github.com/mindspotgb/GBSat/issues>.
+
+
+
+

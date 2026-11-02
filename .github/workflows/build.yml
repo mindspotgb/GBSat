@@ -1,0 +1,231 @@
+name: Build GBSat
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: Android version code, higher than the latest local and cloud builds
+        type: string
+        required: true
+      bundle:
+        description: Also build the App Bundle (.aab) for Google Play
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  GBSAT_VERSION_CODE: ${{ inputs.version_code }}
+
+# A newer manual dispatch supersedes an earlier build of the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Validate Android version code
+        env:
+          BUILD_VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          if [[ ! "$BUILD_VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]] || ((10#$BUILD_VERSION_CODE > 2100000000)); then
+            echo "::error::Supply a positive Android version code up to 2100000000."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # CMake is not preinstalled on every hosted runner. Reuse the pinned SDK package.
+      - name: Restore Android CMake cache
+        uses: actions/cache@v5
+        with:
+          path: /usr/local/lib/android/sdk/cmake/3.31.6
+          key: android-cmake-linux-3.31.6
+
+      - name: Install NDK, CMake and platform
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+          packages=()
+          for package in "ndk;27.2.12479018" "cmake;3.31.6" "platforms;android-36" "build-tools;36.0.0"; do
+            case "$package" in
+              "ndk;"*) path="$ANDROID_HOME/ndk/${package#ndk;}";;
+              "cmake;"*) path="$ANDROID_HOME/cmake/${package#cmake;}";;
+              "platforms;"*) path="$ANDROID_HOME/platforms/${package#platforms;}";;
+              "build-tools;"*) path="$ANDROID_HOME/build-tools/${package#build-tools;}";;
+            esac
+            [ -d "$path" ] || packages+=("$package")
+          done
+          if [ "${#packages[@]}" -gt 0 ]; then
+            # Accept licenses only when the runner actually needs to install SDK packages.
+            yes | sdkmanager --licenses >/dev/null || true
+            sdkmanager --install "${packages[@]}"
+          else
+            echo "Android SDK packages already present; skipping license checks and installation"
+          fi
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: 8.14.3
+          # Builds run on the default main branch, so allow cache writes here.
+          cache-read-only: false
+
+      - name: Install ccache
+        run: sudo apt-get install -y -qq ccache
+
+      - name: Restore ccache (compiled objects from earlier builds)
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ccache
+          key: ccache-native-${{ github.run_id }}
+          restore-keys: ccache-native-
+
+      - name: Resolve DXC release
+        id: dxc
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh api repos/microsoft/DirectXShaderCompiler/releases/latest --jq .tag_name)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Restore DXC archive cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/gbsat-dxc
+          key: dxc-linux-${{ steps.dxc.outputs.tag }}
+
+      - name: Install DXC (HLSL to SPIR-V shader compiler)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$HOME/.cache/gbsat-dxc"
+          if ! ls "$HOME/.cache/gbsat-dxc"/linux_dxc_*.tar.gz >/dev/null 2>&1; then
+            gh release download "${{ steps.dxc.outputs.tag }}" -R microsoft/DirectXShaderCompiler -p 'linux_dxc_*.tar.gz' -D "$HOME/.cache/gbsat-dxc"
+          fi
+          sudo mkdir -p /opt/dxc && sudo tar -xzf "$HOME"/.cache/gbsat-dxc/linux_dxc_*.tar.gz -C /opt/dxc
+          echo "/opt/dxc/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/opt/dxc/lib:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
+          /opt/dxc/bin/dxc --version || true
+
+      - name: Restore signing key (same key across builds so new APKs install over old ones)
+        uses: actions/cache@v5
+        with:
+          path: ~/.android/debug.keystore
+          key: gbsat-signing-key-v1
+
+      - name: Create sideload signing key (debug keystore)
+        run: |
+          mkdir -p ~/.android
+          [ -f ~/.android/debug.keystore ] || keytool -genkeypair -v -keystore ~/.android/debug.keystore \
+            -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Release signing key (repository secrets)
+        env:
+          KEYSTORE_B64: ${{ secrets.GBSAT_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/gbsat-release.jks"
+            echo "GBSAT_KEYSTORE_FILE=$RUNNER_TEMP/gbsat-release.jks" >> "$GITHUB_ENV"
+            echo "::notice title=Signing::APK signed with the GBSat release key"
+          else
+            echo "::warning title=Signing::GBSAT_KEYSTORE_BASE64 secret not set; APK signed with the cached debug key"
+          fi
+
+      # Tests run locally before dispatch; cloud runners only package the release APK.
+      # The App Bundle (.aab, Google Play) is only built for a release (a VERSION without a GitHub release yet) or when
+      # asked for in a manual run; everyday builds make the APK only
+      - name: Bundle needed?
+        id: aab
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(tr -d '[:space:]' < apps/android/VERSION)
+          if [ "${{ inputs.bundle }}" = "true" ] || ! gh release view "v${VER}" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "tasks=assembleRelease bundleRelease" >> "$GITHUB_OUTPUT"; echo "::notice title=App Bundle::building the .aab too"
+          else
+            echo "tasks=assembleRelease" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release APK
+        working-directory: apps/android
+        env:
+          GBSAT_KEYSTORE_PASSWORD: ${{ secrets.GBSAT_KEYSTORE_PASSWORD }}
+        run: |
+          set +e
+          export CCACHE_DIR=$HOME/.cache/ccache CCACHE_MAXSIZE=600M CCACHE_COMPILERCHECK=content
+          ccache -z >/dev/null
+          gradle --no-daemon ${{ steps.aab.outputs.tasks }} -PgbsatCcache --build-cache -x lintVitalAnalyzeRelease -x lintVitalReportRelease -x lintVitalRelease --stacktrace > build.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            msg=$( (grep -E "^e: " build.log | cut -c1-400; grep -nE "error:|error\\b|FAILED|What went wrong|Caused by|undefined|CMake Error" -A3 build.log | head -80) | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+            echo "::error title=Build errors::$msg"
+          fi
+          tail -60 build.log
+          # Where the time went (shown as notices on the run): ccache hits and the slowest Gradle tasks
+          ccache -s | head -12 | sed 's/^/ccache: /'
+          echo "::notice title=ccache::$(ccache -s | tr -s ' ' | grep -iE 'hit|miss|cache size' | head -6 | tr '\n' ';')"
+          exit $rc
+
+      - name: Name APK with version
+        id: ver
+        run: |
+          VER=$(tr -d '[:space:]' < apps/android/VERSION)
+          NAME="GBSat-v${VER}-build${GBSAT_VERSION_CODE}"
+          cd apps/android/app/build/outputs/apk/release
+          mv *.apk "${NAME}.apk"
+          if ls ../../bundle/release/*.aab >/dev/null 2>&1; then mv ../../bundle/release/*.aab "${NAME}.aab"; fi
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "::notice title=APK::${NAME}.apk"
+
+      - name: Validate APK 16 KB compatibility (GBFrame shared validator)
+        shell: bash
+        run: |
+          set -euo pipefail
+          VALIDATOR="$RUNNER_TEMP/check-android-16kb.sh"
+          curl --fail --silent --show-error --location \
+            "https://raw.githubusercontent.com/mindspotgb/GBFrame/6fb96ecac381cf7613b7e3321ade39b73b052fd0/tools/check-android-16kb.sh" \
+            -o "$VALIDATOR"
+          APK_DIR="apps/android/app/build/outputs/apk/release"
+          APK=$(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$APK"
+          bash "$VALIDATOR" "$APK"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.ver.outputs.name }}
+          path: |
+            apps/android/app/build/outputs/apk/release/*.apk
+            apps/android/app/build/outputs/apk/release/*.aab
+
+      # A release is published once per version: when apps/android/VERSION changes to a version that has no release yet,
+      # this build is published as release v<version> with the APK named GBSat-v<version>.apk and the matching
+      # CHANGELOG.md section as release notes.
+      - name: Publish release for a new version
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(tr -d '[:space:]' < apps/android/VERSION)
+          if gh release view "v${VER}" >/dev/null 2>&1; then
+            echo "Release v${VER} already exists; nothing to publish"
+            exit 0
+          fi
+          cp "apps/android/app/build/outputs/apk/release/${{ steps.ver.outputs.name }}.apk" "GBSat-v${VER}.apk"
+          awk -v ver="$VER" '
+            /^## / { if (found) exit; if (index($0, "## " ver) == 1) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "GBSat ${VER}" > notes.md
+          gh release create "v${VER}" "GBSat-v${VER}.apk" --target "$GITHUB_SHA" --title "GBSat ${VER}" --notes-file notes.md
+          echo "::notice title=Release::Published v${VER}"
+

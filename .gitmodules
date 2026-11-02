@@ -1,0 +1,27 @@
+[submodule "vendor/mio"]
+	path = vendor/mio
+	url = https://github.com/StrikerX3/mio.git
+[submodule "vendor/concurrentqueue/concurrentqueue"]
+	path = vendor/concurrentqueue/concurrentqueue
+	url = https://github.com/cameron314/concurrentqueue.git
+[submodule "vendor/xxHash/xxHash"]
+	path = vendor/xxHash/xxHash
+	url = https://github.com/Cyan4973/xxHash
+[submodule "vendor/libchdr/libchdr"]
+	path = vendor/libchdr/libchdr
+	url = https://github.com/rtissera/libchdr.git
+[submodule "vendor/fmt"]
+	path = vendor/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "vendor/stb/stb"]
+	path = vendor/stb/stb
+	url = https://github.com/nothings/stb.git
+[submodule "vendor/dr_libs/dr_libs"]
+	path = vendor/dr_libs/dr_libs
+	url = https://github.com/mackron/dr_libs.git
+[submodule "vendor/rcheevos"]
+	path = vendor/rcheevos
+	url = https://github.com/RetroAchievements/rcheevos.git
+[submodule "libs/gbframe"]
+	path = libs/gbframe
+	url = https://github.com/mindspotgb/GBFrame

@@ -1,0 +1,80 @@
+package app.gbsat.emulator
+
+import android.view.Surface
+
+/** JNI surface of libgbsat.so (see cpp/gbsat_jni.cpp). */
+object NativeBridge {
+    init { System.loadLibrary("gbsat") }
+
+    @JvmStatic external fun nativeInit(backupRamPath: String, smpcPath: String): String?
+    @JvmStatic external fun nativeShutdown()
+    @JvmStatic external fun nativeSetSurface(surface: Surface?)
+    @JvmStatic external fun nativeLoadIpl(path: String): String?
+    @JvmStatic external fun nativeLoadDisc(path: String): String?
+    @JvmStatic external fun nativeSwapDisc(path: String): String?
+    @JvmStatic external fun nativeEjectDisc()
+    @JvmStatic external fun nativeSetTrayOpen(open: Boolean)
+    @JvmStatic external fun nativeReset(hard: Boolean)
+    @JvmStatic external fun nativeSetPaused(paused: Boolean)
+    @JvmStatic external fun nativeSetFastForward(ff: Boolean)
+    @JvmStatic external fun nativeSetButtons(mask: Int)
+    @JvmStatic external fun nativeSetAnalog(x: Int, y: Int, l: Int, r: Int)
+    @JvmStatic external fun nativeSetPadType(analog: Boolean)
+    @JvmStatic external fun nativeSetSH2Cache(on: Boolean)
+    @JvmStatic external fun nativeSetSH2SyncStep(cycles: Int)
+    @JvmStatic external fun nativeSetSH2Jit(mode: Int)
+    @JvmStatic external fun nativeReopenBackup(backupRamPath: String)
+    @JvmStatic external fun nativeSetIdleSkip(on: Boolean)
+    @JvmStatic external fun nativeSetOneField(on: Boolean)
+    @JvmStatic external fun nativeSetThreadedVdp(on: Boolean)
+    @JvmStatic external fun nativeSetResolutionScale(scale: Int)
+    @JvmStatic external fun nativeSetDeinterlace(allowed: Boolean)
+    @JvmStatic external fun nativeGetDiscHeader(): String?
+    @JvmStatic external fun nativeGetLastFrame(): IntArray?
+    @JvmStatic external fun nativeSetCdReadSpeed(factor: Int)
+    @JvmStatic external fun nativeSetFrameSkip(on: Boolean)
+    /** Skip Engine: maximum speed through CD loads, black transitions and save waits. */
+    @JvmStatic external fun nativeSetAutoSkip(loads: Boolean, transitions: Boolean, saves: Boolean)
+    @JvmStatic external fun nativeSetAudio(volume: Int, ffMode: Int)
+    @JvmStatic external fun nativeGetStats(): LongArray
+    @JvmStatic external fun nativeSetLogSettings(settings: String)
+    @JvmStatic external fun nativeSetRenderer(mode: Int)
+    @JvmStatic external fun nativeGetGpuError(): String?
+    @JvmStatic external fun nativeSetCrashFile(path: String)
+
+    // RetroAchievements
+    @JvmStatic external fun nativeRaInit(userAgent: String)
+    @JvmStatic external fun nativeRaLogin(user: String, secret: String, isToken: Boolean)
+    @JvmStatic external fun nativeRaLogout()
+    @JvmStatic external fun nativeRaSetHardcore(on: Boolean)
+    @JvmStatic external fun nativeRaPollEvents(): ByteArray
+    @JvmStatic external fun nativeRaAchievements(): ByteArray
+    @JvmStatic external fun nativeRaHashFile(path: String): String?
+    @JvmStatic external fun nativeGetGpuName(): String
+    /** GPU usage (%) of this app since the last call (timestamp queries); -1 when not measured. */
+    @JvmStatic external fun nativeGetGpuLoad(): Float
+    @JvmStatic external fun nativeSetThreadedScsp(on: Boolean)
+
+    @JvmStatic external fun nativeSetScspMode(mode: Int)
+    @JvmStatic external fun nativeGetThreadedScsp(): Boolean
+    @JvmStatic external fun nativeScspModeKnown()
+    @JvmStatic external fun nativeGlFailed(): Boolean
+    @JvmStatic external fun nativeTakeCartNotice(): String?
+    @JvmStatic external fun nativeRaHttpResponse(id: Int, status: Int, body: ByteArray?)
+
+    /** Called from native code (rcheevos) to perform an HTTP request; the response goes back via nativeRaHttpResponse. */
+    @JvmStatic fun raHttp(id: Int, url: String, post: String?, contentType: String?, userAgent: String) =
+        gb.frame.RetroAchievements.httpRequest(id, url, post, contentType, userAgent)
+    @JvmStatic external fun nativeSetDisplayOptions(filter: Int, shader: Int)
+    @JvmStatic external fun nativeSetCheats(addrs: LongArray, values: LongArray, sizes: IntArray)
+    @JvmStatic external fun nativeSetFastBoot(on: Boolean)
+    @JvmStatic external fun nativeGetDiscHash(): String?
+    @JvmStatic external fun nativeSaveState(path: String): String?
+    @JvmStatic external fun nativeLoadState(path: String): String?
+}
+
+/** Bit positions match the core peripheral::Button. */
+enum class SaturnButton(val bit: Int) {
+    Right(1 shl 15), Left(1 shl 14), Down(1 shl 13), Up(1 shl 12), Start(1 shl 11),
+    A(1 shl 10), C(1 shl 9), B(1 shl 8), R(1 shl 7), X(1 shl 6), Y(1 shl 5), Z(1 shl 4), L(1 shl 3)
+}

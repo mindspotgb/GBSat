@@ -1,0 +1,34 @@
+{
+  "about": "Recommended settings per game and device class (gb.frame.GameProfiles / DeviceTier): low = little cores only (e.g. Rockchip RK3566), mid = 2 fast cores or fewer, or Cortex-A73-class big cores (e.g. Unisoc T618, Snapdragon G1 Gen 2, Snapdragon 662; threadedAudio only applies with 2 fast cores), high = 3+ fast cores; GPU capacity is considered separately for the app profile. Only \"all\" and the device's own class apply. Keys: renderer (cpu | gpu), threadedAudio (true | false), frameSkip (true | false), idleSkip (false: no SH-2 idle-loop skipping), threadedVdp (false: VDP1/VDP2 rendered on the emulation thread). idleSkip and threadedVdp are not user options: set them to false (usually under \"all\") only for a game that misbehaves with them. Values come from performance logs on real devices; add a game only with measurements.",
+  "games": [
+    {
+      "titles": ["VIRTUA FIGHTER 2"],
+      "mid": { "renderer": "cpu", "threadedAudio": true, "frameSkip": true },
+      "low": { "threadedAudio": true }
+    },
+    {
+      "titles": ["DAYTONA USA CHAMPIONSHIP CIRCUIT EDITION"],
+      "ids": ["MK-81213"],
+      "low": { "threadedAudio": true }
+    },
+    {
+      "titles": ["GUARDIANHEROES"],
+      "ids": ["MK-81035"],
+      "low": { "threadedAudio": true }
+    },
+    {
+      "titles": ["J:AZEL PANZER DRAGOON RPG U:PANZER DRAGOON SAGA", "PANZER DRAGOON SAGA", "AZEL PANZER DRAGOON RPG"],
+      "mid": { "renderer": "cpu", "threadedAudio": true }
+    },
+    {
+      "titles": ["BURNING RANGERS"],
+      "mid": { "renderer": "cpu", "threadedAudio": true },
+      "low": { "threadedAudio": true, "frameSkip": false }
+    },
+    {
+      "titles": ["NIGHTS", "NiGHTS"],
+      "mid": { "renderer": "cpu", "threadedAudio": true },
+      "low": { "threadedAudio": true }
+    }
+  ]
+}
