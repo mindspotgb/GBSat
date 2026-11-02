@@ -67,6 +67,9 @@ internal object SaturnControls : ControlsHost {
     override var touchControlsMode: TouchControlsMode
         get() = Emulator.touchControlsMode
         set(value) { Emulator.touchControlsMode = value; Emulator.savePrefs(); Emulator.applyOptions() }
+    override var touchHapticsEnabled: Boolean
+        get() = Emulator.touchHapticsEnabled
+        set(value) { Emulator.touchHapticsEnabled = value; Emulator.savePrefs() }
 
     private fun label(b: SaturnButton) = when (b) {
         SaturnButton.Up -> "D-pad up"; SaturnButton.Down -> "D-pad down"; SaturnButton.Left -> "D-pad left"; SaturnButton.Right -> "D-pad right"

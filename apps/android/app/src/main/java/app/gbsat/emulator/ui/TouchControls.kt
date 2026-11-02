@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,16 +13,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.gbsat.emulator.Emulator
 import app.gbsat.emulator.SaturnButton
+import gb.frame.TouchControlButton
+import gb.frame.TouchDirection
+import gb.frame.TouchDPad
 import kotlin.math.abs
 import kotlin.math.hypot
 
@@ -65,12 +63,12 @@ fun TouchControls(modifier: Modifier, landscape: Boolean) {
         // Right: face buttons
         Box(Modifier.align(if (landscape) Alignment.BottomEnd else Alignment.CenterEnd).padding(bottom = 16.dp * s)
             .scaled(1f, if (landscape) 1f else 0.5f).size(190.dp)) {
-            Face("X", SaturnButton.X, Modifier.align(Alignment.TopStart).offset(x = 0.dp, y = 8.dp))
-            Face("Y", SaturnButton.Y, Modifier.align(Alignment.TopCenter).offset(y = (-4).dp))
-            Face("Z", SaturnButton.Z, Modifier.align(Alignment.TopEnd).offset(y = 8.dp))
-            Face("A", SaturnButton.A, Modifier.align(Alignment.BottomStart).offset(y = (-8).dp))
-            Face("B", SaturnButton.B, Modifier.align(Alignment.BottomCenter).offset(y = 4.dp))
-            Face("C", SaturnButton.C, Modifier.align(Alignment.BottomEnd).offset(y = (-8).dp))
+            Face("X", SaturnButton.X, Modifier.align(Alignment.TopStart).offset(x = 0.dp, y = 8.dp), Color(0xFFCFD5E4))
+            Face("Y", SaturnButton.Y, Modifier.align(Alignment.TopCenter).offset(y = (-4).dp), Color(0xFFCFD5E4))
+            Face("Z", SaturnButton.Z, Modifier.align(Alignment.TopEnd).offset(y = 8.dp), Color(0xFFCFD5E4))
+            Face("A", SaturnButton.A, Modifier.align(Alignment.BottomStart).offset(y = (-8).dp), Color(0xFF16A982))
+            Face("B", SaturnButton.B, Modifier.align(Alignment.BottomCenter).offset(y = 4.dp), Color(0xFFE7B832))
+            Face("C", SaturnButton.C, Modifier.align(Alignment.BottomEnd).offset(y = (-8).dp), Color(0xFF3566D4))
         }
 
         // Start
@@ -79,74 +77,32 @@ fun TouchControls(modifier: Modifier, landscape: Boolean) {
 }
 
 @Composable
-private fun PressableBox(owner: Any, bits: Int, modifier: Modifier, shape: androidx.compose.ui.graphics.Shape, content: @Composable BoxScope.() -> Unit) {
-    var down by remember { mutableStateOf(false) }
-    val haptic = LocalHapticFeedback.current
-    Box(
-        modifier
-            .background(if (down) padPressed else padColor, shape)
-            .pointerInput(bits) {
-                awaitEachGesture {
-                    awaitFirstDown(); down = true; TouchState.set(owner, bits); haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    do { val e = awaitPointerEvent() } while (e.changes.any { it.pressed })
-                    down = false; TouchState.set(owner, 0)
-                }
-            },
-        contentAlignment = Alignment.Center, content = content,
-    )
-}
-
-@Composable
-private fun Face(label: String, b: SaturnButton, modifier: Modifier) =
-    PressableBox(b, b.bit, modifier.size(58.dp), CircleShape) { Text(label, color = Color.White, fontSize = 20.sp) }
+private fun Face(label: String, b: SaturnButton, modifier: Modifier, tint: Color) =
+    TouchControlButton(label, { down -> TouchState.set(b, if (down) b.bit else 0) }, modifier.size(58.dp), tint, hapticsEnabled = Emulator.touchHapticsEnabled)
 
 @Composable
 private fun Shoulder(label: String, b: SaturnButton) =
-    PressableBox(b, b.bit, Modifier.size(width = 96.dp, height = 44.dp), RoundedCornerShape(12.dp)) { Text(label, color = Color.White, fontSize = 18.sp) }
+    TouchControlButton(label, { down -> TouchState.set(b, if (down) b.bit else 0) }, Modifier.size(width = 96.dp, height = 44.dp), Color(0xFF30354A), RoundedCornerShape(12.dp), Emulator.touchHapticsEnabled)
 
 @Composable
 private fun StartButton() =
-    PressableBox("start", SaturnButton.Start.bit, Modifier.size(width = 84.dp, height = 36.dp), RoundedCornerShape(18.dp)) { Text("START", color = Color.White, fontSize = 13.sp) }
+    TouchControlButton("START", { down -> TouchState.set("start", if (down) SaturnButton.Start.bit else 0) }, Modifier.size(width = 84.dp, height = 36.dp), Color(0xFF354F9A), RoundedCornerShape(18.dp), Emulator.touchHapticsEnabled)
 
 @Composable
-private fun DPad() {
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    var mask by remember { mutableIntStateOf(0) }
-    Box(
-        Modifier.size(170.dp).onSizeChanged { size = it }
-            .background(padColor, CircleShape)
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val first = awaitFirstDown()
-                    fun update(p: Offset) {
-                        val c = Offset(size.width / 2f, size.height / 2f)
-                        val d = p - c
-                        var m = 0
-                        val dead = size.width * 0.12f
-                        // Allow diagonals when both axes exceed the dead zone.
-                        if (d.x > dead) m = m or SaturnButton.Right.bit
-                        if (d.x < -dead) m = m or SaturnButton.Left.bit
-                        if (d.y > dead) m = m or SaturnButton.Down.bit
-                        if (d.y < -dead) m = m or SaturnButton.Up.bit
-                        mask = m; TouchState.set("dpad", m)
-                    }
-                    update(first.position)
-                    do {
-                        val e = awaitPointerEvent()
-                        e.changes.firstOrNull()?.let { update(it.position) }
-                    } while (e.changes.any { it.pressed })
-                    mask = 0; TouchState.set("dpad", 0)
-                }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        fun lit(b: SaturnButton) = if (mask and b.bit != 0) padPressed else Color.Transparent
-        Box(Modifier.align(Alignment.TopCenter).size(52.dp, 60.dp).background(lit(SaturnButton.Up), RoundedCornerShape(12.dp)))
-        Box(Modifier.align(Alignment.BottomCenter).size(52.dp, 60.dp).background(lit(SaturnButton.Down), RoundedCornerShape(12.dp)))
-        Box(Modifier.align(Alignment.CenterStart).size(60.dp, 52.dp).background(lit(SaturnButton.Left), RoundedCornerShape(12.dp)))
-        Box(Modifier.align(Alignment.CenterEnd).size(60.dp, 52.dp).background(lit(SaturnButton.Right), RoundedCornerShape(12.dp)))
-    }
-}
+private fun DPad() = TouchDPad(
+    onDirectionsChanged = { directions ->
+        val mask = directions.fold(0) { bits, direction ->
+            bits or when (direction) {
+                TouchDirection.UP -> SaturnButton.Up.bit
+                TouchDirection.DOWN -> SaturnButton.Down.bit
+                TouchDirection.LEFT -> SaturnButton.Left.bit
+                TouchDirection.RIGHT -> SaturnButton.Right.bit
+            }
+        }
+        TouchState.set("dpad", mask)
+    },
+    hapticsEnabled = Emulator.touchHapticsEnabled,
+)
 
 @Composable
 private fun AnalogStick() {

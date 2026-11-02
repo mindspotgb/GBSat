@@ -54,6 +54,7 @@ object Emulator {
     var threadedVdp = true; private set // VDP1/VDP2 rendering on their own threads
     var scspMode by mutableStateOf(0)        // threaded audio: 0 = Auto (per game, tuned while playing), 1 = On, 2 = Off
     var touchControlsMode by mutableStateOf(TouchControlsMode.AUTO)
+    var touchHapticsEnabled by mutableStateOf(true)
     var aspect by mutableStateOf(0) // 0 = 4:3, 1 = fill, 2 = 16:9
     /** Apply built-in Saturn widescreen codes when a matching game runs in 16:9. */
     var widescreenGameHacks by mutableStateOf(gb.frame.GameHackPolicy.DEFAULT_ENABLED)
@@ -462,6 +463,7 @@ object Emulator {
         touchControlsMode = runCatching {
             TouchControlsMode.valueOf(prefs.getString("touchControlsMode", TouchControlsMode.AUTO.name) ?: TouchControlsMode.AUTO.name)
         }.getOrDefault(TouchControlsMode.AUTO)
+        touchHapticsEnabled = prefs.getBoolean("touchHapticsEnabled", true)
         aspect = prefs.getInt("aspect", 0).coerceIn(0, 2)
         widescreenGameHacks = prefs.getBoolean("widescreenGameHacks", gb.frame.GameHackPolicy.DEFAULT_ENABLED)
         showFps = prefs.getBoolean("showFps", false)
@@ -569,7 +571,7 @@ object Emulator {
     private fun savePrefsEditor(globals: GameOpts?) = prefs.edit()
         .putString("gamesDir", gamesDir).putBoolean("analogPad", analogPad).putBoolean("sh2Cache", sh2Cache).putInt("sh2Sync", cpuSync).putBoolean("cpuRecompiler", sh2Recompiler)
         .putInt("scspMode", globals?.scspMode ?: scspMode).putBoolean("gameProfiles", useGameProfiles)
-        .putString("touchControlsMode", touchControlsMode.name).remove("touch").putInt("aspect", aspect).putBoolean("widescreenGameHacks", widescreenGameHacks).putBoolean("showFps", showFps).putBoolean("showSpeed", showSpeed).putBoolean("showFfButton", showFfButton).putBoolean("showRenderer", showRenderer).putBoolean("showResolution", showResolution).putBoolean("showCpu", showCpu).putBoolean("showGpu", showGpu).putBoolean("showFrameTime", showFrameTime)
+        .putString("touchControlsMode", touchControlsMode.name).putBoolean("touchHapticsEnabled", touchHapticsEnabled).remove("touch").putInt("aspect", aspect).putBoolean("widescreenGameHacks", widescreenGameHacks).putBoolean("showFps", showFps).putBoolean("showSpeed", showSpeed).putBoolean("showFfButton", showFfButton).putBoolean("showRenderer", showRenderer).putBoolean("showResolution", showResolution).putBoolean("showCpu", showCpu).putBoolean("showGpu", showGpu).putBoolean("showFrameTime", showFrameTime)
         .putBoolean("fastBoot", fastBoot).putInt("renderer", globals?.renderer ?: renderer).putInt("filter", filter).putInt("shader", shader).putInt("resScale", resScale).putInt("cdSpeed", cdSpeed).putBoolean("skipLoads", skipLoads).putBoolean("skipTransitions", skipTransitions).putBoolean("skipSaves", skipSaves).putBoolean("frameSkip", globals?.frameSkip ?: frameSkip).putInt("volume", volume).putBoolean("autoSave", autoSave).putBoolean("autoLoad", autoLoad).putInt("ffAudio", ffAudio)
         .putBoolean("ffToggle", ffToggle)
 

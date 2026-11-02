@@ -155,7 +155,7 @@ fun SettingsScreen(onBack: () -> Unit, toast: (String) -> Unit, page: SettingsPa
                                 AboutCredit("SegaXtreme community", "Source of Saturn widescreen codes and patches"),
                             ),
                             license = "GBSat source code is distributed under GNU GPL v3. GBFrame is used under GPLv3 here; third-party components keep their own licenses. Google Play Billing and Play Services are supplied under Google's separate SDK terms. See the notices below. Sega Saturn is a trademark of Sega; GBSat is not affiliated with Sega.",
-                            privacyPolicyUrl = "https://github.com/mindspotgb/GBSat/blob/main/PRIVACY.md",
+                            privacyPolicyUrl = "https://raw.githubusercontent.com/mindspotgb/GBSat/main/PRIVACY.md",
                             tagline = "Brought to you by GameBeacon.dev: 32-bit magic revived with precision and high performance.",
                             licenseDocuments = listOf(
                                 AboutLicenseDocument("GNU GPL v3 — GBSat, GBFrame and Ymir", "licenses/GNU-GPL-3.0.txt"),
