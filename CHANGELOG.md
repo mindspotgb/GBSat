@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0
+- First standalone Android release. Includes the Saturn core, Vulkan and OpenGL ES rendering, GBFrame library and menus, game profiles, cheats, save states, and RetroAchievements.
 - Align the Kotlin, manifest, and JNI class package with the installed application ID `app.gbsat.emulator`.
 - Auto frame skip starts earlier on the CPU renderer, compares three-second windows from similar VDP1 scene loads, increases skip cadence after repeatable savings, and retries after a five-second pause when skipping hurts. Vulkan thresholds remain unchanged.
 - Reduce SH-2 JIT code-write watch overhead for writes that do not overlap compiled code.
