@@ -225,7 +225,7 @@ private fun GameMenu(onDismiss: () -> Unit) {
                 EnhancedResolutionQuickMenuItem(
                     value = Emulator.resScale,
                     values = listOf(1, 2, 3, 4, 0),
-                    labels = listOf("1x", "2x", "3x", "4x", "Native"),
+                    labels = listOf("1x", "2x", "3x", "4x", gb.frame.EnhancedResolutionBest),
                     id = "resolution",
                 ) { value ->
                     Emulator.resScale = value

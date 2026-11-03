@@ -270,8 +270,8 @@ private fun VideoPage() {
             EnhancedResolutionSettingsRow(
                 value = Emulator.resScale,
                 values = listOf(1, 2, 3, 4, 0),
-                labels = listOf("1x", "2x", "3x", "4x", "Native"),
-                sub = "Sharper 3D sprites and polygons; higher values need a faster GPU. Native matches the screen (${Emulator.nativeScale}x here)",
+                labels = listOf("1x", "2x", "3x", "4x", gb.frame.EnhancedResolutionBest),
+                sub = "Sharper 3D sprites and polygons; higher values need a faster GPU. Best matches the screen (${Emulator.nativeScale}x here)",
                 onChange = ch { Emulator.resScale = it },
             )
             val gpuErr = remember { runCatching { NativeBridge.nativeGetGpuError().orEmpty() }.getOrDefault("") }

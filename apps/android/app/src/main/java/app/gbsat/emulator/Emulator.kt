@@ -124,7 +124,7 @@ object Emulator {
         val v = presetValues(p)
         return listOf(
             "Renderer: ${if (v.renderer == 4) "GPU (Vulkan)" else "CPU (OpenGL)"}",
-            "Resolution: ${if (v.resScale == 0) "Native (${nativeScale}x)" else "${v.resScale}x"}",
+            "Resolution: ${if (v.resScale == 0) gb.frame.enhancedResolutionBestLabel("${nativeScale}x") else "${v.resScale}x"}",
             "Shader: ${if (v.shader == 1) "Scanlines" else "Off"}",
             "Filter: ${if (v.filter == 0) "Nearest" else "Bilinear"}",
             "Auto frame skip: ${if (v.frameSkip) "On" else "Off"}",
@@ -180,9 +180,9 @@ object Emulator {
     var skipLoads by mutableStateOf(false)
     var skipTransitions by mutableStateOf(false)
     var skipSaves by mutableStateOf(false)
-    var resScale by mutableStateOf(1) // GPU internal resolution scale (1x..4x); 0 = Native (matches the screen)
+    var resScale by mutableStateOf(1) // GPU internal resolution scale (1x..4x); 0 = Best (matches the screen)
     /**
-     * Scale used for "Native": the screen's short side divided by the Saturn's ~224 lines, rounded, at most what the GPU
+     * Scale used for "Best": the screen's short side divided by the Saturn's ~224 lines, rounded, at most what the GPU
      * handles (4x on Adreno 730+, 3x on Adreno 640-7xx / Mali-G710+, 1x on weaker GPUs).
      */
     val nativeScale: Int
@@ -191,7 +191,7 @@ object Emulator {
             return Math.round(minOf(m.widthPixels, m.heightPixels) / 224f).coerceIn(1, device.gpuMaxScale.coerceIn(1, 4))
         }
     val effectiveScale get() = if (resScale == 0) nativeScale else resScale
-    val resScaleLabel get() = if (resScale == 0) "Native (${nativeScale}x)" else "${resScale}x"
+    val resScaleLabel get() = if (resScale == 0) gb.frame.enhancedResolutionBestLabel("${nativeScale}x") else "${resScale}x"
     var filter by mutableStateOf(1)   // 0 nearest, 1 bilinear
     var shader by mutableStateOf(gb.frame.Shaders.NONE) // presenter shader id (gb.frame.Shaders)
     var ffToggle by mutableStateOf(false) // fast-forward hotkey: false = hold, true = toggle
