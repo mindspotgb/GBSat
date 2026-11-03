@@ -49,7 +49,7 @@ Drive the game with `adb shell input` (keyevents for the pad: DPAD_*, BUTTON_A/B
 device; never copy them into the repo, and never commit `test-output`.
 
 ### Reading the results
-- Log tags: `GBSat` (native core), `GBSat-SAF` (storage), `GBSat-Disc` / `GBFrame-Disc` (disc loading and the copy fallback),
+- Log tags: `GBSat` (native core), `GBFrame-SAF` (storage), `GBSat-Disc` / `GBFrame-Disc` (disc loading and the copy fallback),
   `GBSat-RA` (RetroAchievements), `GBNative*` (kit native), plus `AndroidRuntime` (Java crash), `DEBUG` / `libc` (native crash).
 - A disc that fails with "file not found" means the descriptor read failed and the app is falling back to a cached copy
   (`GBFrame-Disc: Descriptor read failed`); see `docs/LESSONS.md` in the kit.

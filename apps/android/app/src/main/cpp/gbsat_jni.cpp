@@ -169,6 +169,9 @@ struct Context {
     std::mutex lastFrameMutex;
     std::vector<uint32_t> lastFrame;
     uint32_t lastFrameW = 0, lastFrameH = 0;
+    // The last frame came from a Vulkan target: its thumbnail is read from the presenter on demand (ReadShownFrame)
+    // instead of mapping the GPU buffer on every frame.
+    std::atomic<bool> lastFrameOnGpu{false};
     std::string dataDir;      // GBSat data folder (carts/ holds the ROM cartridge dumps)
     int cartType = -1;        // cartridge in the slot: 0 none, 1/2/3 = 1/4/6 MiB RAM, 4 = backup memory, 10 = ROM
     std::string cartNotice;   // message about the cartridge picked for the last loaded disc (read once by the app)
@@ -429,22 +432,37 @@ static void ReadDiagnosticProps() {
     util::waitstats::g_vdpBatch.store(!gb::DiagOn("gbsat", "vdp_nobatch"), std::memory_order_relaxed);
 }
 
-void UpdateFrameMetadata(const uint32_t *fb, uint32_t width, uint32_t height, uint32_t stridePixels = 0) {
+// Save state thumbnail: `fb` downscaled to at most ~352 px wide.
+void Downscale(const uint32_t *fb, uint32_t width, uint32_t height, uint32_t stridePixels, std::vector<uint32_t> &out,
+               uint32_t &outW, uint32_t &outH) {
+    const uint32_t step = std::max<uint32_t>(1, width / 352);
+    outW = width / step;
+    outH = height / step;
+    out.resize((size_t)outW * outH);
+    for (uint32_t y = 0; y < outH; ++y) {
+        const uint32_t *src = fb + (size_t)(y * step) * stridePixels;
+        uint32_t *dst = out.data() + (size_t)y * outW;
+        for (uint32_t x = 0; x < outW; ++x) dst[x] = src[x * step] | 0xFF000000u;
+    }
+}
+
+bool SkipEngineWantsPicture() {
+    return g->skip.skipLoads.load(std::memory_order_relaxed) || g->skip.skipTransitions.load(std::memory_order_relaxed) ||
+           g->skip.skipSaves.load(std::memory_order_relaxed);
+}
+
+// thumbnail: keep a downscaled copy for save states (CPU frames, cheap); Vulkan frames are read on demand instead.
+void UpdateFrameMetadata(const uint32_t *fb, uint32_t width, uint32_t height, uint32_t stridePixels = 0,
+                         bool thumbnail = true) {
     if (stridePixels == 0) stridePixels = width;
     g->presented.fetch_add(1, std::memory_order_relaxed);
+    g->lastFrameOnGpu.store(!thumbnail, std::memory_order_relaxed);
     if (fb) {
         g->skip.OnFrame(fb, width, height, stridePixels); // Skip Engine: black / still picture
-        const uint32_t step = std::max<uint32_t>(1, width / 352);
-        const uint32_t tw = width / step, th = height / step;
-        std::lock_guard lk(g->lastFrameMutex);
-        g->lastFrame.resize((size_t)tw * th);
-        for (uint32_t y = 0; y < th; ++y) {
-            const uint32_t *src = fb + (size_t)(y * step) * stridePixels;
-            uint32_t *dst = g->lastFrame.data() + (size_t)y * tw;
-            for (uint32_t x = 0; x < tw; ++x) dst[x] = src[x * step] | 0xFF000000u;
+        if (thumbnail) {
+            std::lock_guard lk(g->lastFrameMutex);
+            Downscale(fb, width, height, stridePixels, g->lastFrame, g->lastFrameW, g->lastFrameH);
         }
-        g->lastFrameW = tw;
-        g->lastFrameH = th;
     }
     g->videoW.store(width, std::memory_order_relaxed);
     g->videoH.store(height, std::memory_order_relaxed);
@@ -494,18 +512,23 @@ void OnVulkanHardwareFrame(AHardwareBuffer *buffer, uint64_t token, uint32_t wid
     if (!reportedSharedOutput.exchange(true, std::memory_order_relaxed)) {
         LOGI("Vulkan AHardwareBuffer output active: GPU-to-GPU copy, existing GL filters retained");
     }
-    AHardwareBuffer_Desc desc{};
-    AHardwareBuffer_describe(buffer, &desc);
+    // Mapping the GPU buffer makes this thread wait for the GPU, so it is only done when the Skip Engine needs the
+    // picture (any skip option on); save state thumbnails read the frame on screen when asked (nativeGetLastFrame).
     void *pixels = nullptr;
-    const int lockResult = AHardwareBuffer_lock(buffer, AHARDWAREBUFFER_USAGE_CPU_READ_RARELY, -1, nullptr, &pixels);
+    int lockResult = -1;
+    AHardwareBuffer_Desc desc{};
+    if (SkipEngineWantsPicture()) {
+        AHardwareBuffer_describe(buffer, &desc);
+        lockResult = AHardwareBuffer_lock(buffer, AHARDWAREBUFFER_USAGE_CPU_READ_RARELY, -1, nullptr, &pixels);
+        if (lockResult != 0) LOGW("Could not map Vulkan AHardwareBuffer for frame analysis (%d)", lockResult);
+    }
     if (lockResult == 0 && pixels) {
-        UpdateFrameMetadata(static_cast<const uint32_t *>(pixels), width, height, desc.stride);
+        UpdateFrameMetadata(static_cast<const uint32_t *>(pixels), width, height, desc.stride, false);
         int releaseFence = -1;
         AHardwareBuffer_unlock(buffer, &releaseFence);
         if (releaseFence >= 0) close(releaseFence);
     } else {
-        LOGW("Could not map Vulkan AHardwareBuffer for frame analysis (%d)", lockResult);
-        UpdateFrameMetadata(nullptr, width, height);
+        UpdateFrameMetadata(nullptr, width, height, 0, false);
     }
     g->lastScale.store(scale ? scale : 1, std::memory_order_relaxed);
     glr::SubmitVulkanTarget(token, width, height, scale);
@@ -1956,6 +1979,11 @@ JNI_FN(jintArray, nativeGetLastFrame)(JNIEnv *env, jclass) {
         return nullptr;
     }
     std::lock_guard lk(g->lastFrameMutex);
+    if (g->lastFrameOnGpu.load(std::memory_order_relaxed)) {
+        glr::ReadShownFrame([](const uint32_t *fb, uint32_t w, uint32_t h, uint32_t stride) {
+            Downscale(fb, w, h, stride, g->lastFrame, g->lastFrameW, g->lastFrameH);
+        });
+    }
     if (g->lastFrame.empty()) {
         return nullptr;
     }

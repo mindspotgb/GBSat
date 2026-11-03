@@ -676,14 +676,26 @@ object Emulator {
 
     /** Saves the auto save state without blocking (used when the app goes to the background during a game). */
     fun autoSaveInBackground() {
+        if (quitting) return // quitAfterAutoSave is already writing it
         rememberScspMode()
         if (autoSave && running && currentGame != null) scope.launch { saveState(AUTO_SLOT) }
     }
 
-    /** Saves the auto save state synchronously (used when quitting the app from a game). */
-    fun autoSaveBlocking() {
+    private var quitting = false
+
+    /**
+     * Quitting the app from a game: writes the auto save state, then runs [quit]. The save runs on the IO dispatcher
+     * and the main thread stays free meanwhile (a save through SAF to a slow SD card could otherwise freeze it into an
+     * "app not responding" dialog).
+     */
+    fun quitAfterAutoSave(quit: () -> Unit) {
+        if (quitting) return
+        quitting = true
         rememberScspMode()
-        if (autoSave && running && currentGame != null) kotlinx.coroutines.runBlocking { saveState(AUTO_SLOT) }
+        scope.launch {
+            if (autoSave && running && currentGame != null) saveState(AUTO_SLOT)
+            quit()
+        }
     }
 
     /** Auto threaded audio: remembers the mode the tuner kept for this game. */

@@ -83,8 +83,7 @@ class MainActivity : ComponentActivity() {
         if (hasFocus) setImmersiveMode(true) // hide the system bars again after dialogs, pickers or app switches
     }
 
-    private fun quitApp() {
-        Emulator.autoSaveBlocking()
+    private fun quitApp() = Emulator.quitAfterAutoSave {
         NativeBridge.nativeShutdown()
         finishAndRemoveTask()
         android.os.Process.killProcess(android.os.Process.myPid()) // emulator state lives in the process; start clean next time
