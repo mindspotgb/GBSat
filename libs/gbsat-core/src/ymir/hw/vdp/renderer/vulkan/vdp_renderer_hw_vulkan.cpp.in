@@ -145,6 +145,10 @@ struct VulkanVDPRenderer::Impl {
     VkDevice device = VK_NULL_HANDLE;
     VkQueue queue = VK_NULL_HANDLE;
     uint32 queueFamily = 0;
+    // Timestamp tick length and valid bits of the queue (GPU time for the overlay's GPU usage)
+    double timestampPeriodNs = 0.0;
+    uint64 timestampMask = 0;
+    uint64 lastTimestampEnd = 0; // end of the last measured command buffer (overlapping spans are counted once)
     bool ownsDevice = false;
     VkPhysicalDeviceMemoryProperties memProps{};
     VkDeviceSize uboAlign = 256;
@@ -301,6 +305,9 @@ struct VulkanVDPRenderer::Impl {
         VkCommandBuffer cmd = VK_NULL_HANDLE;
         VkFence fence = VK_NULL_HANDLE;
         bool submitted = false;
+        // GPU time of this command buffer for the overlay: timestamps at its start and end (no pool: not measured)
+        VkQueryPool queryPool = VK_NULL_HANDLE;
+        bool timed = false;
 
         GpuBuffer uploadBuffer;
         VkDeviceSize uploadOffset = 0;
@@ -935,6 +942,12 @@ struct VulkanVDPRenderer::Impl {
         VkCommandBufferBeginInfo cbbi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         cbbi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(frameCtx.cmd, &cbbi);
+        if (frameCtx.queryPool != VK_NULL_HANDLE) {
+            vkCmdResetQueryPool(frameCtx.cmd, frameCtx.queryPool, 0, 2);
+            // BOTTOM_OF_PIPE: written once earlier work has drained, so the span starts when this buffer can run
+            // (TOP_OF_PIPE is written as soon as the command processor reaches it, while the previous frame still runs)
+            vkCmdWriteTimestamp(frameCtx.cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameCtx.queryPool, 0);
+        }
         frameCtx.uploadOffset = 0;
         pendingBarrier = true; // order against work from previous submissions
     }
@@ -946,6 +959,9 @@ struct VulkanVDPRenderer::Impl {
         mb.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
         vkCmdPipelineBarrier(frameCtx.cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &mb, 0, nullptr, 0, nullptr);
+        if (frameCtx.queryPool != VK_NULL_HANDLE) {
+            vkCmdWriteTimestamp(frameCtx.cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frameCtx.queryPool, 1);
+        }
         vkEndCommandBuffer(frameCtx.cmd);
 
         VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};
@@ -957,6 +973,7 @@ struct VulkanVDPRenderer::Impl {
             return;
         }
         frameCtx.submitted = true;
+        frameCtx.timed = frameCtx.queryPool != VK_NULL_HANDLE;
     }
 
     void WaitFrame(FrameContext &frameCtx) {
@@ -964,6 +981,24 @@ struct VulkanVDPRenderer::Impl {
             vkWaitForFences(device, 1, &frameCtx.fence, VK_TRUE, UINT64_MAX);
             vkResetFences(device, 1, &frameCtx.fence);
             frameCtx.submitted = false;
+            if (frameCtx.timed) {
+                // The fence has signalled, so both timestamps are available: no wait here
+                frameCtx.timed = false;
+                uint64 ts[2] = {};
+                if (vkGetQueryPoolResults(device, frameCtx.queryPool, 0, 2, sizeof(ts), ts, sizeof(uint64),
+                                          VK_QUERY_RESULT_64_BIT) == VK_SUCCESS) {
+                    // One queue runs the buffers in order: count only the part of this span after the previous end
+                    const uint64 begin = ts[0] & timestampMask, end = ts[1] & timestampMask;
+                    if (lastTimestampEnd > begin && lastTimestampEnd - begin > (timestampMask >> 1)) {
+                        lastTimestampEnd = 0; // the counter wrapped (queues with fewer than 64 valid bits)
+                    }
+                    const uint64 from = begin > lastTimestampEnd ? begin : lastTimestampEnd;
+                    const uint64 ticks = end > from ? end - from : 0;
+                    if (end > lastTimestampEnd) lastTimestampEnd = end;
+                    util::waitstats::g_gpuBusyNs.fetch_add((uint64)((double)ticks * timestampPeriodNs),
+                                                           std::memory_order_relaxed);
+                }
+            }
         }
     }
 
@@ -1241,6 +1276,33 @@ struct VulkanVDPRenderer::Impl {
                 return util::ErrorMessage{fmt::format("vkCreateFence failed ({})", (int)r)};
             }
         }
+        // GPU time measurement for the overlay: two timestamps per command buffer, when the queue has timestamps
+        {
+            uint32 qCount = 0;
+            vkGetPhysicalDeviceQueueFamilyProperties(physDevice, &qCount, nullptr);
+            std::vector<VkQueueFamilyProperties> qprops(qCount);
+            vkGetPhysicalDeviceQueueFamilyProperties(physDevice, &qCount, qprops.data());
+            VkPhysicalDeviceProperties tprops;
+            vkGetPhysicalDeviceProperties(physDevice, &tprops);
+            const uint32 bits = queueFamily < qCount ? qprops[queueFamily].timestampValidBits : 0;
+            bool pools = bits > 0 && tprops.limits.timestampPeriod > 0.0f;
+            for (size_t i = 0; pools && i < frames.Count(); ++i) {
+                VkQueryPoolCreateInfo qpci{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
+                qpci.queryType = VK_QUERY_TYPE_TIMESTAMP;
+                qpci.queryCount = 2;
+                pools = vkCreateQueryPool(device, &qpci, nullptr, &frames[i].queryPool) == VK_SUCCESS;
+            }
+            if (pools) {
+                timestampPeriodNs = tprops.limits.timestampPeriod;
+                timestampMask = bits >= 64 ? ~0ull : ((1ull << bits) - 1);
+                util::waitstats::g_gpuTimed.store(true, std::memory_order_relaxed);
+            } else {
+                for (size_t i = 0; i < frames.Count(); ++i) {
+                    if (frames[i].queryPool) vkDestroyQueryPool(device, frames[i].queryPool, nullptr);
+                    frames[i].queryPool = VK_NULL_HANDLE;
+                }
+            }
+        }
         BeginCommands(frames.GetCurrentFrame());
 
         // Descriptor pool
@@ -1505,9 +1567,11 @@ struct VulkanVDPRenderer::Impl {
         ownedImages.clear();
         ownedBuffers.clear();
         if (descPool) vkDestroyDescriptorPool(device, descPool, nullptr);
+        util::waitstats::g_gpuTimed.store(false, std::memory_order_relaxed); // no Vulkan GPU time any more
         for (size_t i = 0; i < frames.Count(); ++i) {
             FrameContext &f = frames[i];
             if (f.fence) vkDestroyFence(device, f.fence, nullptr);
+            if (f.queryPool) vkDestroyQueryPool(device, f.queryPool, nullptr);
             if (f.cmdPool) vkDestroyCommandPool(device, f.cmdPool, nullptr);
         }
         if (ownsDevice) {
