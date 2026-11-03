@@ -182,13 +182,13 @@ object Emulator {
     var skipSaves by mutableStateOf(false)
     var resScale by mutableStateOf(1) // GPU internal resolution scale (1x..4x); 0 = Best (matches the screen)
     /**
-     * Scale used for "Best": the screen's short side divided by the Saturn's ~224 lines, rounded, at most what the GPU
-     * handles (4x on Adreno 730+, 3x on Adreno 640-7xx / Mali-G710+, 1x on weaker GPUs).
+     * Scale used for "Best": the largest whole multiple of the Saturn's ~224 lines that fits the screen's short side,
+     * up to 4x. It does not depend on the GPU: a weaker device gets the same size and may run slower.
      */
     val nativeScale: Int
         get() {
             val m = appContext.resources.displayMetrics
-            return Math.round(minOf(m.widthPixels, m.heightPixels) / 224f).coerceIn(1, device.gpuMaxScale.coerceIn(1, 4))
+            return (minOf(m.widthPixels, m.heightPixels) / 224).coerceIn(1, 4)
         }
     val effectiveScale get() = if (resScale == 0) nativeScale else resScale
     val resScaleLabel get() = if (resScale == 0) gb.frame.enhancedResolutionBestLabel("${nativeScale}x") else "${resScale}x"
