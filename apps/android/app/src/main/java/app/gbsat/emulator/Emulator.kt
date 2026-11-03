@@ -57,7 +57,7 @@ object Emulator {
     var touchHapticsEnabled by mutableStateOf(true)
     var aspect by mutableStateOf(0) // 0 = 4:3, 1 = fill, 2 = 16:9
     /** Apply built-in Saturn widescreen codes when a matching game runs in 16:9. */
-    var widescreenGameHacks by mutableStateOf(gb.frame.GameHackPolicy.DEFAULT_ENABLED)
+    var widescreenGameHacks by mutableStateOf(gb.frame.GameHackPolicy.WIDESCREEN_DEFAULT_ENABLED)
     var showFps by mutableStateOf(false)
     var showSpeed by mutableStateOf(false)
     var showFfButton by mutableStateOf(false)
@@ -465,7 +465,7 @@ object Emulator {
         }.getOrDefault(TouchControlsMode.AUTO)
         touchHapticsEnabled = prefs.getBoolean("touchHapticsEnabled", true)
         aspect = prefs.getInt("aspect", 0).coerceIn(0, 2)
-        widescreenGameHacks = prefs.getBoolean("widescreenGameHacks", gb.frame.GameHackPolicy.DEFAULT_ENABLED)
+        widescreenGameHacks = prefs.getBoolean("widescreenGameHacks", gb.frame.GameHackPolicy.WIDESCREEN_DEFAULT_ENABLED)
         showFps = prefs.getBoolean("showFps", false)
         showSpeed = prefs.getBoolean("showSpeed", false)
         showFfButton = prefs.getBoolean("showFfButton", false)
