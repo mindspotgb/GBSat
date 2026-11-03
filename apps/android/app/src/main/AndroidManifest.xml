@@ -25,7 +25,45 @@
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|smallestScreenSize"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.GBSat.Launch" />
+            android:theme="@style/Theme.GBSat.Launch">
+            <!-- Let Android frontends (ES-DE, Daijisho, Pegasus, etc.) open supported Saturn disc images. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.chd" />
+                <data android:pathPattern=".*\\.CHD" />
+                <data android:pathPattern=".*\\.cue" />
+                <data android:pathPattern=".*\\.CUE" />
+                <data android:pathPattern=".*\\.iso" />
+                <data android:pathPattern=".*\\.ISO" />
+                <data android:pathPattern=".*\\.mds" />
+                <data android:pathPattern=".*\\.MDS" />
+                <data android:pathPattern=".*\\.ccd" />
+                <data android:pathPattern=".*\\.CCD" />
+            </intent-filter>
+            <!-- Some frontends send file/content URIs without a MIME type. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:pathPattern=".*\\.chd" />
+                <data android:pathPattern=".*\\.CHD" />
+                <data android:pathPattern=".*\\.cue" />
+                <data android:pathPattern=".*\\.CUE" />
+                <data android:pathPattern=".*\\.iso" />
+                <data android:pathPattern=".*\\.ISO" />
+                <data android:pathPattern=".*\\.mds" />
+                <data android:pathPattern=".*\\.MDS" />
+                <data android:pathPattern=".*\\.ccd" />
+                <data android:pathPattern=".*\\.CCD" />
+            </intent-filter>
+        </activity>
         <activity-alias
             android:name="app.gbsat.emulator.BitmapLauncherActivity"
             android:targetActivity="app.gbsat.emulator.MainActivity"

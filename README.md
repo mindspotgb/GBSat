@@ -35,7 +35,15 @@ These screenshots show the app using real Saturn games and their actual cover ar
 </p>
 <p align="center">
   <img src="docs/screenshots/settings-performance.png" width="48%" alt="GBSat performance settings on Retroid Pocket Nova">
-  <img src="docs/screenshots/gameplay.png" width="48%" alt="NiGHTS Into Dreams gameplay on Retroid Pocket Nova">
+  <img src="docs/screenshots/library.png" width="48%" alt="GBSat game library with real Saturn game covers">
+</p>
+<p align="center">
+  <img src="docs/screenshots/gameplay-daytona.png" width="48%" alt="Daytona USA gameplay in GBSat">
+  <img src="docs/screenshots/gameplay-virtua-fighter-2.png" width="48%" alt="Virtua Fighter 2 gameplay in GBSat">
+</p>
+<p align="center">
+  <img src="docs/screenshots/gameplay-guardian-heroes.png" width="48%" alt="Guardian Heroes gameplay in GBSat">
+  <img src="docs/screenshots/gameplay-nights.png" width="48%" alt="NiGHTS Into Dreams gameplay in GBSat">
 </p>
 
 ## All features
