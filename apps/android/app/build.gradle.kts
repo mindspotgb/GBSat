@@ -1,9 +1,26 @@
+import java.util.Properties
+
 // Version: apps/android/VERSION holds the release version (x.y.z); CI adds the build number (GitHub run number).
 val gbsatVersion = rootProject.file("VERSION").readText().trim()
 val gbsatBuild = (providers.gradleProperty("gbsatVersionCode").orNull
     ?: System.getenv("GBSAT_VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt().also {
     require(it in 1..2100000000) { "gbsatVersionCode must be a positive Android version code" }
 }
+
+// Signing (GBFrame CONVENTIONS.md "Signing"): the permanent key comes from GBSAT_KEYSTORE_FILE/GBSAT_KEYSTORE_PASSWORD
+// (CI) or from gbsat.keystore.file/gbsat.keystore.passwordFile in local.properties (owner's PC), and signs debug and
+// release alike. Without it the APK is a side-by-side "GBSat Dev" (app.gbsat.emulator.dev) signed with the debug key,
+// so a differently signed APK can never claim the official application ID.
+val gbsatLocalProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+val gbsatKeyPath = System.getenv("GBSAT_KEYSTORE_FILE") ?: gbsatLocalProperties.getProperty("gbsat.keystore.file")
+val gbsatKey = gbsatKeyPath?.let { file(it) }?.takeIf { it.isFile }
+val gbsatKeyPassword = System.getenv("GBSAT_KEYSTORE_PASSWORD")
+    ?: gbsatLocalProperties.getProperty("gbsat.keystore.passwordFile")?.let { file(it) }?.takeIf { it.isFile }
+        ?.readText()?.trim()
+if (gbsatKeyPath != null && gbsatKey == null) throw GradleException("Configured GBSat keystore does not exist")
+if (gbsatKey != null && gbsatKeyPassword.isNullOrBlank()) throw GradleException("GBSat keystore password is missing")
 
 plugins {
     id("com.android.application")
@@ -24,6 +41,8 @@ android {
         targetSdk = 36
         versionCode = gbsatBuild
         versionName = "$gbsatVersion (build $gbsatBuild)"
+        if (gbsatKey == null) applicationIdSuffix = ".dev"
+        manifestPlaceholders["appLabel"] = if (gbsatKey == null) "GBSat Dev" else "GBSat"
 
         // The emulator core's hot paths are NEON-optimized; 32-bit ARM and x86 are not supported.
         ndk { abiFilters += "arm64-v8a" }
@@ -60,15 +79,12 @@ android {
     }
 
     signingConfigs {
-        // Permanent release key: CI decodes the GBSAT_KEYSTORE_BASE64 secret to GBSAT_KEYSTORE_FILE. Every APK signed
-        // with it installs over the previous one. Without it (forks, local builds) the debug keystore is used.
-        val releaseKey = System.getenv("GBSAT_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
         create("sideload") {
-            if (releaseKey != null) {
-                storeFile = releaseKey
-                storePassword = System.getenv("GBSAT_KEYSTORE_PASSWORD")
+            if (gbsatKey != null) {
+                storeFile = gbsatKey
+                storePassword = gbsatKeyPassword
                 keyAlias = "gbsat"
-                keyPassword = System.getenv("GBSAT_KEYSTORE_PASSWORD")
+                keyPassword = gbsatKeyPassword
             } else {
                 storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
                 storePassword = "android"

@@ -1,7 +1,7 @@
 # GBSat project notes
 
 GBSat is the Sega Saturn emulator for Android of the GB family (core: the Ymir fork in `libs/gbsat-core`; UI kit: the
-GBFrame submodule in `libs/gbframe`). Read `libs/gbframe/AGENTS.md` too: it holds the kit's rules and what belongs to the
+GBFrame submodule in `libs/gbframe`). Read `libs/gbframe/CONVENTIONS.md` too: it holds the kit's rules and what belongs to the
 kit and what to the app. Talk to the owner in Portuguese; code, comments, commits and CHANGELOG entries are in English.
 
 ## Repositories and branches

@@ -45,7 +45,7 @@ param(
 $Title = 'GBSat'
 $Name = 'gbsat'
 $Repo = 'mindspotgb/GBSat'
-$Branch = 'android-port'
+$Branch = 'main'
 $App = 'app.gbsat.emulator'
 # APP is both applicationId and namespace; Activity is the fully qualified source class (it may use a different package)
 $Activity = 'app.gbsat.emulator.MainActivity'

@@ -10,7 +10,7 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_controller_transparent"
         android:roundIcon="@mipmap/ic_controller_transparent"
-        android:label="GBSat"
+        android:label="${appLabel}"
         android:theme="@style/Theme.GBSat">
         <meta-data
             android:name="gb.frame.bitmapLauncherAlias"
@@ -71,7 +71,7 @@
             android:exported="true"
             android:icon="@mipmap/ic_controller_transparent"
             android:roundIcon="@mipmap/ic_controller_transparent"
-            android:label="GBSat">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -84,7 +84,7 @@
             android:exported="true"
             android:icon="@mipmap/ic_controller_adaptive"
             android:roundIcon="@mipmap/ic_controller_adaptive"
-            android:label="GBSat">
+            android:label="${appLabel}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
