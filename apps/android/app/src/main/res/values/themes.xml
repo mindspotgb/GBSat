@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Edge-to-edge comes from enableEdgeToEdge() in MainActivity; the screens handle the insets themselves -->
-    <style name="Theme.GBSat" parent="@style/GBFrameLaunchTheme">
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
-    </style>
+    <!-- Edge-to-edge and the cutout mode come from gb.frame.FullScreen in MainActivity; the screens handle the insets -->
+    <style name="Theme.GBSat" parent="@style/GBFrameLaunchTheme" />
 </resources>

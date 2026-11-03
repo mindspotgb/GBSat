@@ -18,7 +18,6 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import gb.frame.setControllerContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -43,7 +42,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        gb.frame.FullScreen.apply(this) // edge-to-edge without the window APIs Android 15 deprecates
         // The first D-pad press after a touch moves the focus right away (gb.frame.setControllerContent)
         setControllerContent { GBSatRoot(onImmersive = ::setImmersiveMode, onQuitApp = ::quitApp) }
         // A game requested by a frontend or `am start` (gb.frame.LaunchIntent); started by GBSatRoot once the app is ready
@@ -92,12 +91,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setImmersiveMode(on: Boolean) {
-        val c = WindowInsetsControllerCompat(window, window.decorView)
         // The app intentionally stays immersive. Android Back is dispatched to the active Compose BackHandler.
-        if (on) {
-            c.hide(WindowInsetsCompat.Type.systemBars())
-            c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        } else c.show(WindowInsetsCompat.Type.systemBars())
+        if (on) gb.frame.FullScreen.hideSystemBars(this)
+        else WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
     }
 
     // ---- Physical gamepad support ----
