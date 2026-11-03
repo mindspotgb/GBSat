@@ -161,8 +161,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER=$(tr -d '[:space:]' < apps/android/VERSION)
+          echo "bundle=false" >> "$GITHUB_OUTPUT"
           if [ "${{ inputs.bundle }}" = "true" ] || ! gh release view "v${VER}" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "tasks=assembleRelease bundleRelease" >> "$GITHUB_OUTPUT"; echo "::notice title=App Bundle::building the .aab too"
+            echo "tasks=assembleRelease" >> "$GITHUB_OUTPUT"; echo "bundle=true" >> "$GITHUB_OUTPUT"; echo "::notice title=App Bundle::building the .aab too"
           else
             echo "tasks=assembleRelease" >> "$GITHUB_OUTPUT"
           fi
@@ -186,6 +187,14 @@ jobs:
           ccache -s | head -12 | sed 's/^/ccache: /'
           echo "::notice title=ccache::$(ccache -s | tr -s ' ' | grep -iE 'hit|miss|cache size' | head -6 | tr '\n' ';')"
           exit $rc
+
+      # The Play bundle is its own build: channel "play" drops the install permission Play restricts (GBFrame docs/APP_UPDATES_STANDARD.md).
+      - name: Build Play bundle
+        if: steps.aab.outputs.bundle == 'true'
+        working-directory: apps/android
+        env:
+          GBSAT_KEYSTORE_PASSWORD: ${{ secrets.GBSAT_KEYSTORE_PASSWORD }}
+        run: gradle --no-daemon bundleRelease -PgbChannel=play -PgbsatCcache --build-cache -x lintVitalAnalyzeRelease -x lintVitalReportRelease -x lintVitalRelease
 
       - name: Name APK with version
         id: ver

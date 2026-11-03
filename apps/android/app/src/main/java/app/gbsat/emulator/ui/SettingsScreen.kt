@@ -313,9 +313,14 @@ private fun PerformancePage() {
     }
 }
 
+/** Official repository the kit update check reads releases from (GBFrame docs/APP_UPDATES_STANDARD.md). */
+val UPDATE_CONFIG = gb.frame.AppUpdateConfig(githubRepo = "mindspotgb/GBSat")
+
 @Composable
 private fun ExtrasPage() {
     gb.frame.AppLanguageSettings()
+    SettingsGroup("Updates", null) { gb.frame.UpdateCheckRow(gb.frame.rememberUpdateController(UPDATE_CONFIG)) }
+    Spacer(Modifier.height(12.dp))
     Spacer(Modifier.height(12.dp))
     RetroAchievementsSettings("GBSat")
 }

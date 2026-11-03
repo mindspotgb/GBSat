@@ -86,6 +86,7 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
             } else if (!Emulator.setupDone) {
                 SetupWizard(onFinish = { Emulator.finishSetup() })
             } else {
+                gb.frame.AppUpdatePrompt(UPDATE_CONFIG)
                 BackHandler(screen == Screen.Settings) {
                     screen = Screen.Library
                     if (MenuState.open.value) {

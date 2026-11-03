@@ -43,6 +43,11 @@ android {
         versionName = "$gbsatVersion (build $gbsatBuild)"
         if (gbsatKey == null) applicationIdSuffix = ".dev"
         manifestPlaceholders["appLabel"] = if (gbsatKey == null) "GBSat Dev" else "GBSat"
+        // Update channel (GBFrame docs/APP_UPDATES_STANDARD.md): -PgbChannel=play for the Google Play bundle, otherwise github.
+        val gbChannel = providers.gradleProperty("gbChannel").getOrElse("github")
+        manifestPlaceholders["gbUpdateChannel"] = gbChannel
+        manifestPlaceholders["gbInstallPermission"] =
+            if (gbChannel == "play") "android.permission.INTERNET" else "android.permission.REQUEST_INSTALL_PACKAGES"
 
         // The emulator core's hot paths are NEON-optimized; 32-bit ARM and x86 are not supported.
         ndk { abiFilters += "arm64-v8a" }
