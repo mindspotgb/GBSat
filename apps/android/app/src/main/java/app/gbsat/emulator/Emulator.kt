@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -616,6 +617,7 @@ object Emulator {
     }
 
     suspend fun launch(path: String, useAutoLoad: Boolean = true): String? = withContext(Dispatchers.IO) {
+        quitJob?.join() // a quit still saving closes its game first
         if (!iplLoaded) return@withContext "Load a Saturn BIOS (IPL ROM) in Settings first."
         rememberScspMode() // a game was still running
         openDisc?.close()
@@ -659,16 +661,22 @@ object Emulator {
     fun toggleFastForward() { fastForward = !fastForward; NativeBridge.nativeSetFastForward(fastForward) }
     fun reset(hard: Boolean) = NativeBridge.nativeReset(hard)
     fun toggleTray() { trayOpen = !trayOpen; NativeBridge.nativeSetTrayOpen(trayOpen) }
+    // The auto save and close started by quitGame: endGame and launch wait for it, or its closeGame, finishing later,
+    // closed the game a frontend intent had just started (and a second Exit saved and closed twice)
+    private var quitJob: Job? = null
+
     /** Closes the game, saving the auto save state first when enabled. */
     fun quitGame() {
+        if (quitJob?.isActive == true) return
         if (autoSave && running && currentGame != null) {
             pause(true)
-            scope.launch { saveState(AUTO_SLOT); closeGame() }
+            quitJob = scope.launch { saveState(AUTO_SLOT); closeGame() }
         } else closeGame()
     }
 
     /** Closes the game like [quitGame] but waits for the auto save (an intent starting another game while one runs). */
     suspend fun endGame() {
+        quitJob?.join()
         if (!running) return
         if (autoSave && currentGame != null) { pause(true); saveState(AUTO_SLOT) }
         closeGame()

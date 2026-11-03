@@ -25,7 +25,11 @@ import app.gbsat.emulator.ui.GBSatRoot
 import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
-    private var padMask = 0
+    private var padMask = 0 // buttons held as keys (and L2/R2 from trigger axes)
+    // Directions from the analog stick / hat axes, kept apart from the keys: a motion event (stick, or analog L2/R2)
+    // rebuilding the directions in padMask released a D-pad held as keys (pads whose D-pad sends DPAD keycodes and
+    // that also have axes: steering with the D-pad while pressing an analog trigger dropped the direction)
+    private var stickDirs = 0
     // Pair a controller's synthetic KEYCODE_BACK with the same physical B press without suppressing
     // a real Back button or debouncing two intentional, rapid Back presses.
     private var lastGamepadBAt = 0L
@@ -153,7 +157,7 @@ class MainActivity : ComponentActivity() {
         ) {
             val consumed = Hotkeys.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN)
             Hotkeys.suppressedKeys().forEach { padMask = padMask and keyBit(it).inv() }
-            Emulator.setPadMask(padMask)
+            Emulator.setPadMask(padMask or stickDirs)
             if (consumed) return true
         }
         if (isPad && Emulator.running && Hotkeys.isSuppressed(event.keyCode)) return true
@@ -165,7 +169,7 @@ class MainActivity : ComponentActivity() {
                 KeyEvent.ACTION_DOWN -> padMask = padMask or bit
                 KeyEvent.ACTION_UP -> padMask = padMask and bit.inv()
             }
-            Emulator.setPadMask(padMask)
+            Emulator.setPadMask(padMask or stickDirs)
             return true
         }
         // In game, a gamepad button the Saturn pad doesn't use (L3 in an L3+X hotkey) must not reach the framework: Android
@@ -222,16 +226,17 @@ class MainActivity : ComponentActivity() {
             val hx = event.getAxisValue(MotionEvent.AXIS_HAT_X)
             val hy = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
             if (Emulator.analogPad) {
+                if (stickDirs != 0) { stickDirs = 0; Emulator.setPadMask(padMask) }
                 val dead = 0.12f
                 fun conv(v: Float) = if (abs(v) < dead) 0x80 else (((v + 1f) * 127.5f).toInt()).coerceIn(0, 255)
                 Emulator.setPadStick(conv(x), conv(y))
             } else {
-                var m = padMask and (SaturnButton.Up.bit or SaturnButton.Down.bit or SaturnButton.Left.bit or SaturnButton.Right.bit).inv()
-                if (x < -0.5f || hx < -0.5f) m = m or SaturnButton.Left.bit
-                if (x > 0.5f || hx > 0.5f) m = m or SaturnButton.Right.bit
-                if (y < -0.5f || hy < -0.5f) m = m or SaturnButton.Up.bit
-                if (y > 0.5f || hy > 0.5f) m = m or SaturnButton.Down.bit
-                padMask = m; Emulator.setPadMask(m)
+                var d = 0
+                if (x < -0.5f || hx < -0.5f) d = d or SaturnButton.Left.bit
+                if (x > 0.5f || hx > 0.5f) d = d or SaturnButton.Right.bit
+                if (y < -0.5f || hy < -0.5f) d = d or SaturnButton.Up.bit
+                if (y > 0.5f || hy > 0.5f) d = d or SaturnButton.Down.bit
+                if (d != stickDirs) { stickDirs = d; Emulator.setPadMask(padMask or stickDirs) }
             }
             val ltv = maxOf(event.getAxisValue(MotionEvent.AXIS_LTRIGGER), event.getAxisValue(MotionEvent.AXIS_BRAKE))
             val rtv = maxOf(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS))
@@ -243,7 +248,7 @@ class MainActivity : ComponentActivity() {
                 var m = padMask
                 if (l2 != 0) m = if (ltv > 0.5f) m or l2 else if (ltv < 0.3f && !l2Key) m and l2.inv() else m
                 if (r2 != 0) m = if (rtv > 0.5f) m or r2 else if (rtv < 0.3f && !r2Key) m and r2.inv() else m
-                if (m != padMask) { padMask = m; Emulator.setPadMask(m) }
+                if (m != padMask) { padMask = m; Emulator.setPadMask(m or stickDirs) }
             }
             return true
         }
