@@ -187,8 +187,8 @@ object Emulator {
      */
     val nativeScale: Int
         get() {
-            val m = appContext.resources.displayMetrics
-            return (minOf(m.widthPixels, m.heightPixels) / 224).coerceIn(1, 4)
+            val (width, height) = gb.frame.realScreenSize(appContext)
+            return (minOf(width, height) / 224).coerceIn(1, 4)
         }
     val effectiveScale get() = if (resScale == 0) nativeScale else resScale
     val resScaleLabel get() = if (resScale == 0) gb.frame.enhancedResolutionBestLabel("${nativeScale}x") else "${resScale}x"
