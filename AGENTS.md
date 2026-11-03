@@ -5,7 +5,7 @@ GBFrame submodule in `libs/gbframe`). Read `libs/gbframe/AGENTS.md` too: it hold
 kit and what to the app. Talk to the owner in Portuguese; code, comments, commits and CHANGELOG entries are in English.
 
 ## Repositories and branches
-- Work on **`android-port`** (the Android app); commit and push there. Never force-push. Releases (the `VERSION` file, release
+- Work on **`main`** (the Android app); commit and push there. Never force-push. Releases (the `VERSION` file, release
   notes, tags) are the owner's: do not touch them.
 - `libs/gbframe` is a separate repo (`mindspotgb/GBFrame`, branch `main`). A change that is generic (every app built on the kit
   would want it) goes into the kit first: `git -C libs/gbframe switch main`, commit, push, then commit the new submodule
@@ -23,9 +23,8 @@ kit and what to the app. Talk to the owner in Portuguese; code, comments, commit
 
 ## Build and CI
 - Local release-signed builds use `tools/build-local.ps1 -BuildNumber <n> -SigningDirectory <external-key-folder> -Install`; it runs the selected app and GBFrame unit tests, verifies the APK signature, and installs over the existing package. The Gradle wrapper is included. GitHub Actions builds remain available for CI and release artifacts.
-- After a push, watch the run (`gh run list/view/watch`). On failure read the annotations
-  (`gh api repos/mindspotgb/GBSat/check-runs/<job id>/annotations`); fix errors and warnings, then push again. The `profile.yml`,
-  `pgo-train.yml`, `screenshots.yml` (commits README images), `vulkan-dev.yml` and `sh2-test.yml` workflows are run by hand.
+- After a push, watch the Android build workflow (`gh run list/view/watch`). On failure, read the job annotations and logs,
+  fix errors and warnings, then push again. Only workflows present in `.github/workflows` are active for this repository.
 
 ## Testing on the device (`tools/gbsat.ps1`)
 Non-interactive; run as `powershell -NoProfile -ExecutionPolicy Bypass -File tools\gbsat.ps1 <Command> [options]`. Results go to
