@@ -2188,6 +2188,14 @@ void ApplyVdpRenderer(bool gpu, bool force = false) {
         ymir::vdp::VulkanRendererContext ctx{};
         ctx.resolutionScale = g->resScale;
         ctx.progress = progress;
+        // The compiled pipelines persist in the data folder: every start compiled them again (about 2.7 s on the RG Rotate)
+        static std::string pipelineCachePath;
+        if (!g->dataDir.empty()) {
+            pipelineCachePath = (std::filesystem::path(g->dataDir) / "cache" / "vulkan-pipelines.bin").string();
+            std::error_code ec;
+            std::filesystem::create_directories(std::filesystem::path(pipelineCachePath).parent_path(), ec);
+            ctx.pipelineCacheFile = pipelineCachePath.c_str();
+        }
         auto renderer = vdp.UseVulkanRenderer(ctx);
         result = static_cast<bool>(renderer);
         if (!renderer) error = renderer.Error().message;

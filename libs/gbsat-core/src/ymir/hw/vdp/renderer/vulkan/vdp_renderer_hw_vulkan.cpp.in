@@ -41,7 +41,9 @@
 #include <concepts>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <functional>
+#include <iterator>
 #include <span>
 #include <string>
 #include <vector>
@@ -143,6 +145,9 @@ struct VulkanVDPRenderer::Impl {
     VkInstance instance = VK_NULL_HANDLE;
     VkPhysicalDevice physDevice = VK_NULL_HANDLE;
     VkDevice device = VK_NULL_HANDLE;
+    VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+    std::string pipelineCacheFile;  // where the compiled pipelines are kept between runs (empty: not kept)
+    size_t pipelineCacheSeeded = 0; // size of the cache data read at start: saved again only when it grew
     VkQueue queue = VK_NULL_HANDLE;
     uint32 queueFamily = 0;
     // Timestamp tick length and valid bits of the queue (GPU time for the overlay's GPU usage)
@@ -765,7 +770,7 @@ struct VulkanVDPRenderer::Impl {
         cpci.stage.module = module;
         cpci.stage.pName = kCSEntrypoint;
         cpci.layout = pipe.layout;
-        VkResult r = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &cpci, nullptr, &pipe.pipeline);
+        VkResult r = vkCreateComputePipelines(device, pipelineCache, 1, &cpci, nullptr, &pipe.pipeline);
         vkDestroyShaderModule(device, module, nullptr);
         if (r != VK_SUCCESS) {
             return util::ErrorMessage{fmt::format("Could not create compute pipeline {} ({})", name, (int)r)};
@@ -1248,11 +1253,53 @@ struct VulkanVDPRenderer::Impl {
         return maxScale;
     }
 
+    /// @brief Creates the pipeline cache, seeded from pipelineCacheFile when it exists. Vulkan ignores data made by
+    /// another driver or device, so a stale file costs only the compile.
+    void CreatePipelineCache() {
+        std::vector<char> data;
+        if (!pipelineCacheFile.empty()) {
+            std::ifstream in(pipelineCacheFile, std::ios::binary);
+            data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        pipelineCacheSeeded = data.size();
+        VkPipelineCacheCreateInfo pcci{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
+        pcci.initialDataSize = data.size();
+        pcci.pInitialData = data.empty() ? nullptr : data.data();
+        const VkResult r = vkCreatePipelineCache(device, &pcci, nullptr, &pipelineCache);
+        if (r != VK_SUCCESS) {
+            pipelineCache = VK_NULL_HANDLE; // compiles without a cache
+        }
+        Step(fmt::format("vk: pipeline cache create {} seeded {} bytes, file '{}'", (int)r, data.size(), pipelineCacheFile).c_str());
+    }
+
+    /// @brief Writes the cache to pipelineCacheFile when this run compiled something the file did not have.
+    void SavePipelineCache() {
+        if (pipelineCache == VK_NULL_HANDLE || pipelineCacheFile.empty()) {
+            Step(fmt::format("vk: pipeline cache not saved (handle {}, file '{}')", pipelineCache != VK_NULL_HANDLE ? 1 : 0, pipelineCacheFile).c_str());
+            return;
+        }
+        size_t size = 0;
+        const VkResult sr = vkGetPipelineCacheData(device, pipelineCache, &size, nullptr);
+        Step(fmt::format("vk: pipeline cache data {} bytes (result {}, seeded {})", size, (int)sr, pipelineCacheSeeded).c_str());
+        if (sr != VK_SUCCESS || size <= pipelineCacheSeeded) {
+            return;
+        }
+        std::vector<char> data(size);
+        if (vkGetPipelineCacheData(device, pipelineCache, &size, data.data()) != VK_SUCCESS) {
+            return;
+        }
+        std::ofstream out(pipelineCacheFile, std::ios::binary | std::ios::trunc);
+        out.write(data.data(), (std::streamsize)size);
+        Step(fmt::format("vk: pipeline cache saved, {} bytes (file open {})", size, out.is_open() ? 1 : 0).c_str());
+    }
+
     util::VoidResult<> Initialize(const VulkanRendererContext &context) {
         maxScale = std::clamp<uint32>(context.resolutionScale, 1u, 6u); // up to 6x for "Native" on 1440p screens (reduced below if the GPU limits are exceeded)
         if (auto result = CreateDevice(context); !result) {
             return result;
         }
+        pipelineCacheFile = context.pipelineCacheFile != nullptr ? context.pipelineCacheFile : "";
+        CreatePipelineCache();
         Step("vk: check formats");
         vkGetPhysicalDeviceMemoryProperties(physDevice, &memProps);
         if (auto result = CheckFormats(); !result) {
@@ -1552,6 +1599,7 @@ struct VulkanVDPRenderer::Impl {
         // Run the initialization commands right away so that failures surface early
         Step("vk: first submit");
         SubmitAndWait();
+        SavePipelineCache();
         Step("vk: ready");
 
         return {};
@@ -1592,6 +1640,8 @@ struct VulkanVDPRenderer::Impl {
             if (f.cmdPool) vkDestroyCommandPool(device, f.cmdPool, nullptr);
         }
         if (ownsDevice) {
+            if (pipelineCache != VK_NULL_HANDLE) vkDestroyPipelineCache(device, pipelineCache, nullptr);
+            pipelineCache = VK_NULL_HANDLE;
             vkDestroyDevice(device, nullptr);
             if (instance) vkDestroyInstance(instance, nullptr);
         }

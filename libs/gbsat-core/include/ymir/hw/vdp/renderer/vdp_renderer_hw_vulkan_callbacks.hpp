@@ -20,6 +20,8 @@ struct VulkanRendererContext {
     /// output frame is delivered at the scaled size. Only applied in non-interlaced, normal horizontal resolution
     /// modes with 16-bit VDP1 framebuffers; other modes render at native resolution.
     uint32 resolutionScale = 1;
+    /// Optional: file where the compiled pipelines are kept between runs. Without it every start compiles them again.
+    const char *pipelineCacheFile = nullptr;
 };
 
 /// @brief Invoked when the Vulkan renderer finishes a frame. `pixels` points to `width * height` RGBA8 pixels (rows
