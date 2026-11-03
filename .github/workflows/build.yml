@@ -41,6 +41,16 @@ jobs:
         with:
           submodules: recursive
 
+      # The app builds the GBFrame commit its submodule points to, not the kit's latest main: a kit change reaches this
+      # build only after the submodule pointer is bumped and committed here. Warn when it is behind.
+      - name: Check GBFrame submodule
+        run: |
+          git -C libs/gbframe fetch --quiet origin main
+          behind=$(git -C libs/gbframe rev-list --count HEAD..FETCH_HEAD)
+          if [ "$behind" -gt 0 ]; then
+            echo "::warning title=GBFrame submodule behind::libs/gbframe is $behind commit(s) behind GBFrame main: kit changes after $(git -C libs/gbframe rev-parse --short HEAD) are not in this build"
+          fi
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
