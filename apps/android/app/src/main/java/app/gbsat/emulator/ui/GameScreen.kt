@@ -49,6 +49,8 @@ fun GameScreen(onQuitApp: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     var fps by remember { mutableFloatStateOf(0f) }
     var stats by remember { mutableStateOf(longArrayOf(0, 320, 224, 0, 1)) }
+    // Read here (the whole screen's scope): changes only when the Skip Engine starts or stops
+    var skipping by remember { mutableStateOf(false) }
 
     BackHandler(enabled = GbSatPausePolicy.shouldHandleBack(menu)) {
         menu = true
@@ -57,7 +59,14 @@ fun GameScreen(onQuitApp: () -> Unit) {
     LaunchedEffect(Unit) {
         var logged = ""
         while (true) {
-            stats = NativeBridge.nativeGetStats(); fps = stats[0] / 100f
+            val next = NativeBridge.nativeGetStats()
+            val nextSkipping = next.getOrElse(6) { 0 } == 1L
+            if (nextSkipping != skipping) skipping = nextSkipping
+            // The numbers are only read by the performance overlay: without it, updating them recomposed nothing useful
+            if (Emulator.showFps || Emulator.showSpeed || Emulator.showCpu || Emulator.showGpu || Emulator.showRenderer ||
+                Emulator.showResolution || Emulator.showFrameTime) {
+                stats = next; fps = next[0] / 100f
+            }
             // The options in use go into the performance log (also the ones changed in the in-game menu)
             Emulator.logSettings().let { if (it != logged) { logged = it; NativeBridge.nativeSetLogSettings(it) } }
             delay(500)
@@ -123,7 +132,7 @@ fun GameScreen(onQuitApp: () -> Unit) {
             onMenu = { menu = true; Emulator.pause(true) },
             showFastForwardButton = Emulator.showFfButton, fastForward = Emulator.fastForward,
             onFastForward = { Emulator.toggleFastForward() },
-            skipping = stats.getOrElse(6) { 0 } == 1L,
+            skipping = skipping,
             message = Emulator.toast,
             perf = { m ->
                 PerfOverlay(

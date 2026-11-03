@@ -1251,6 +1251,7 @@ void EmuLoop() {
             util::waitstats::g_profiledFrames.fetch_add(1, std::memory_order_relaxed);
         }
         g->palMode.store(g->saturn->GetVideoStandard() == ymir::core::config::sys::VideoStandard::PAL, std::memory_order_relaxed);
+        cputune::SetFrameRate(g->palMode.load(std::memory_order_relaxed) ? 50.0 : 60.0);
         UpdateAutoSkip();
         BootFrame();
         bool skipNext = false;
