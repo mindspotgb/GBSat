@@ -90,6 +90,9 @@ struct AudioRing {
     std::atomic<uint32_t> minFill{UINT32_MAX}; // lowest buffer level seen by a callback (frames, performance log)
     std::atomic<uint32_t> burst{0};            // frames asked for by the last callback (performance log)
     int16_t lastL = 0, lastR = 0; // last samples played (consumer side), used to fade out on underruns
+    // Clear() from another thread: the consumer (AAudio callback) owns `tail`, so it applies the request itself. Storing
+    // tail from both sides let a callback in progress write its old position back and replay stale audio.
+    std::atomic<bool> clearRequested{false};
 
     void Push(int16_t l, int16_t r) {
         const uint32_t h = head.load(std::memory_order_relaxed);
@@ -104,6 +107,10 @@ struct AudioRing {
     double pos = 0.0, step = 1.0;
 
     void Pop(int16_t *out, int32_t frames, uint32_t target, bool running) {
+        if (clearRequested.exchange(false, std::memory_order_acq_rel)) {
+            tail.store(head.load(std::memory_order_acquire), std::memory_order_release);
+            pos = 0.0;
+        }
         uint32_t t = tail.load(std::memory_order_relaxed);
         const uint32_t avail = head.load(std::memory_order_acquire) - t;
         if (running) {
@@ -150,8 +157,9 @@ struct AudioRing {
         }
         tail.store(t, std::memory_order_release);
     }
+    // Drops the buffered audio at the next callback (any thread)
     void Clear() {
-        tail.store(head.load(std::memory_order_acquire), std::memory_order_release);
+        clearRequested.store(true, std::memory_order_release);
     }
 };
 
@@ -551,10 +559,18 @@ aaudio_data_callback_result_t AudioDataCb(AAudioStream *, void *, void *audioDat
 
 bool OpenAudio();
 
+// Held while the AAudio reopen thread uses `g` and while nativeShutdown deletes it: a device disconnecting during
+// shutdown could otherwise reopen audio on a deleted context.
+std::mutex g_audioReopenMutex;
+
 void AudioErrorCb(AAudioStream *, void *, aaudio_result_t error) {
     if (error == AAUDIO_ERROR_DISCONNECTED) {
         g->audioOk = false;
-        std::thread([] { OpenAudio(); }).detach(); // reopen on the new default device
+        // AAudio forbids closing or opening streams in its own callback: reopen on the new default device elsewhere
+        std::thread([] {
+            std::lock_guard lk(g_audioReopenMutex);
+            if (g && g->running.load()) OpenAudio();
+        }).detach();
     }
 }
 
@@ -844,6 +860,68 @@ std::string g_logSettings;
 #ifndef GB_APP_ID
 #error "GB_APP_ID is defined by gb_native_add(gbsat APP_ID ...)"
 #endif
+const char kPerfLogHeader[] =
+    "time,game,renderer,scale,threaded_vdp,threaded_scsp,frameskip,fast_forward,emu_fps,shown_fps,"
+    "emu_ms_per_frame,wait_sound_ms,wait_vdp1_ms,wait_vdp2_ms,"
+    "msh2_ms,ssh2_ms,scu_ms,vdp_ms,sched_ms,other_ms,"
+    "worst_frame_ms,slow_frames,vdp1_cmds_per_frame,resolution,sh2_cache,audio_underruns,audio_xruns,"
+    "emu_core,emu_core_mhz,emu_cpu_pct,vdp1_cpu_pct,vdp2_cpu_pct,scsp_cpu_pct,other_cpu_pct,busiest_other,"
+    "thermal_status,thermal_headroom,device,"
+    "msh2_loop_pct,ssh2_loop_pct,msh2_hot_loop,ssh2_hot_loop,msh2_skip_pct,ssh2_skip_pct,"
+    "audio_burst,audio_target,audio_min_fill,msh2_hot_ops,ssh2_hot_ops,msh2_idle_fail,ssh2_idle_fail,"
+    "sched_vdp_ms,sched_sound_ms,sched_cd_ms,sched_other_ms,rendered_frame_ms,skipped_frame_ms,"
+    "wait_vdp2_frame_ms,wait_vdp2_copy_ms,auto_skip_pct,cd_speed_now,"
+    "vulkan_fence_wait_ms,vulkan_frame_callback_ms,settings\n";
+
+// Appends `line` to the performance log on a writer thread of its own. The file restarts with the header when it is
+// missing, over 2 MB or from an older version (other columns; checked once per process).
+void QueuePerfLogLine(const char *path, std::string line) {
+    struct Queue {
+        std::mutex m;
+        std::condition_variable cv;
+        std::deque<std::string> lines;
+        bool started = false;
+    };
+    static Queue *q = new Queue; // never destroyed: the detached writer may wait on it until the process ends
+    {
+        std::lock_guard lk(q->m);
+        if (q->lines.size() < 8) q->lines.push_back(std::move(line)); // stalled storage never piles up memory
+        if (!q->started) {
+            q->started = true;
+            std::thread([path] {
+                bool headerChecked = false;
+                for (;;) {
+                    std::string next;
+                    {
+                        std::unique_lock lk(q->m);
+                        q->cv.wait(lk, [] { return !q->lines.empty(); });
+                        next = std::move(q->lines.front());
+                        q->lines.pop_front();
+                    }
+                    std::error_code ec;
+                    const auto size = std::filesystem::file_size(path, ec);
+                    bool fresh = ec || size > 2u * 1024 * 1024;
+                    if (!fresh && !headerChecked) { // a log from an older version (fewer columns) starts over
+                        char head[4096] = {}; // the header is long (it was cut at 512 and the log restarted every second)
+                        if (FILE *h = fopen(path, "r")) {
+                            fgets(head, sizeof(head), h);
+                            fclose(h);
+                        }
+                        fresh = strstr(head, "vulkan_frame_callback_ms,settings") == nullptr;
+                    }
+                    headerChecked = true;
+                    FILE *f = fopen(path, fresh ? "w" : "a");
+                    if (!f) continue;
+                    if (fresh) fputs(kPerfLogHeader, f);
+                    fputs(next.c_str(), f);
+                    fclose(f);
+                }
+            }).detach();
+        }
+    }
+    q->cv.notify_one();
+}
+
 void WritePerfLog(float fps, float presentedFps, float vdp1CommandsPerFrame) {
     if (auto *jit = g->saturn->GetSH2Jit(); jit != nullptr && jit->mapFile != nullptr) {
         std::fflush(jit->mapFile);
@@ -860,33 +938,13 @@ void WritePerfLog(float fps, float presentedFps, float vdp1CommandsPerFrame) {
     for (char &c : title) {
         if (c == ',' || c == '"' || (unsigned char)c < 32) c = ' ';
     }
-    std::error_code ec;
-    const auto size = std::filesystem::file_size(kPath, ec);
-    bool fresh = ec || size > 2u * 1024 * 1024;
-    if (!fresh) { // a log from an older version (fewer columns) starts over
-        char head[4096] = {}; // the header is long (it was cut at 512 and the log restarted every second)
-        if (FILE *h = fopen(kPath, "r")) {
-            fgets(head, sizeof(head), h);
-            fclose(h);
-        }
-        fresh = strstr(head, "vulkan_frame_callback_ms,settings") == nullptr;
-    }
-    FILE *f = fopen(kPath, fresh ? "w" : "a");
+    // The line is formatted in memory here; QueuePerfLogLine writes it on its own thread (file I/O on shared storage,
+    // every second, could stall a frame of the emulation thread)
+    char *line = nullptr;
+    size_t lineSize = 0;
+    FILE *f = open_memstream(&line, &lineSize);
     if (!f) {
         return;
-    }
-    if (fresh) {
-        fprintf(f, "time,game,renderer,scale,threaded_vdp,threaded_scsp,frameskip,fast_forward,emu_fps,shown_fps,"
-                   "emu_ms_per_frame,wait_sound_ms,wait_vdp1_ms,wait_vdp2_ms,"
-                   "msh2_ms,ssh2_ms,scu_ms,vdp_ms,sched_ms,other_ms,"
-                   "worst_frame_ms,slow_frames,vdp1_cmds_per_frame,resolution,sh2_cache,audio_underruns,audio_xruns,"
-                   "emu_core,emu_core_mhz,emu_cpu_pct,vdp1_cpu_pct,vdp2_cpu_pct,scsp_cpu_pct,other_cpu_pct,busiest_other,"
-                   "thermal_status,thermal_headroom,device,"
-                   "msh2_loop_pct,ssh2_loop_pct,msh2_hot_loop,ssh2_hot_loop,msh2_skip_pct,ssh2_skip_pct,"
-                   "audio_burst,audio_target,audio_min_fill,msh2_hot_ops,ssh2_hot_ops,msh2_idle_fail,ssh2_idle_fail,"
-                   "sched_vdp_ms,sched_sound_ms,sched_cd_ms,sched_other_ms,rendered_frame_ms,skipped_frame_ms,"
-                   "wait_vdp2_frame_ms,wait_vdp2_copy_ms,auto_skip_pct,cd_speed_now,"
-                   "vulkan_fence_wait_ms,vulkan_frame_callback_ms,settings\n");
     }
     const int mode = g->rendererMode;
     const char *renderer = mode == 4 ? "GPU (Vulkan)" : mode == 1 ? "CPU (OpenGL)" : "CPU (plain)";
@@ -1059,7 +1117,11 @@ void WritePerfLog(float fps, float presentedFps, float vdp1CommandsPerFrame) {
             settings.c_str());
     g_renderedNs = g_skippedNs = 0;
     g_renderedFrames = g_skippedFrames = 0;
-    fclose(f);
+    fclose(f); // completes `line`
+    if (line) {
+        QueuePerfLogLine(kPath, std::string(line, lineSize));
+        free(line);
+    }
 }
 
 void EmuLoop() {
@@ -1365,7 +1427,9 @@ void EmuLoop() {
             // Behind when the audio buffer drains below half of its target (the game can't keep up)
             g->behind = g->ring.Fill() < g->targetFill.load() / 2;
             // Audio-driven pacing: keep ~46 ms buffered.
-            while (g->running.load() && !g->paused.load() && g->ring.Fill() > g->targetFill.load()) {
+            // audioOk: a stream lost (device disconnected) and not reopened would never drain the buffer
+            while (g->running.load() && !g->paused.load() && g->audioOk.load() &&
+                   g->ring.Fill() > g->targetFill.load()) {
                 std::this_thread::sleep_for(microseconds(500));
             }
         } else {
@@ -1498,6 +1562,7 @@ JNI_FN(void, nativeShutdown)(JNIEnv *, jclass) {
     if (g->emuThread.joinable()) {
         g->emuThread.join();
     }
+    std::lock_guard reopenLock(g_audioReopenMutex); // waits for a reopen in progress; later ones see g == nullptr
     CloseAudio();
     glr::Shutdown();
     {
