@@ -72,6 +72,10 @@ static const uint outScale = max(BitExtract(g_commonParams.enhancements, 2, 3), 
 // Position in the sprite layer and sprite attributes textures, which are rendered at the internal resolution scale.
 // Background layers are rendered at native resolution and read at the native position.
 static uint2 g_hiPos;
+// The sprite layer pixel and its attributes at g_hiPos, read once per pixel (the compositor needs them in up to five
+// places: layer sort, color calculation condition and ratio, shadow)
+static uint4 g_spritePixel;
+static uint g_spriteAttrs;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Utilities
@@ -168,11 +172,11 @@ bool IsColorCalcEnabled(uint layer, uint2 pos) {
     const bool restrictedColorCalc = BitTest(g_commonParams.layerParams, 24);
     if (layer == kLayerSprite) {
         // Sprites use condition modes based on priority or color MSB
-        const uint layerAttrs = g_layerIn[uint3(g_hiPos, kLayerIndexSprite)].a;
+        const uint layerAttrs = g_spritePixel.a;
         if (restrictedColorCalc && BitTest(layerAttrs, kPixelAttrBitSpecColorCalc)) {
             return false;
         }
-        const uint attrs = g_spriteAttrsIn[uint3(g_hiPos, 0)];
+        const uint attrs = g_spriteAttrs;
         const uint priority = BitExtract(layerAttrs, 0, 3);
         const uint value = BitExtract(g_commonParams.spriteParams, 12, 3);
         const uint cond = BitExtract(g_commonParams.spriteParams, 15, 2);
@@ -215,7 +219,7 @@ uint3 GetLineColor(uint layer, uint2 pos) {
 int GetColorCalcRatio(uint layer, uint2 pos) {
     switch (layer) {
         case kLayerSprite:
-            return BitExtract(g_spriteAttrsIn[uint3(g_hiPos, 0)], kSpriteAttrBitColorCalcRatio, 5);
+            return BitExtract(g_spriteAttrs, kSpriteAttrBitColorCalcRatio, 5);
         case kLayerRBG0:
         case kLayerNBG0_RBG1:
         case kLayerNBG1_EXBG:
@@ -246,8 +250,9 @@ int3 GetColorOffset(uint layer) {
 uint4 GetLayerOutput(uint layer, uint2 pos) {
     switch (layer) {
         case kLayerSprite:
+            return g_spritePixel;
         case kLayerMesh:
-            return g_layerIn[uint3(g_hiPos, GetBGLayerIndex(layer))];
+            return g_layerIn[uint3(g_hiPos, kBGLayerMesh)];
         case kLayerRBG0:
         case kLayerNBG0_RBG1:
         case kLayerNBG1_EXBG:
@@ -315,7 +320,7 @@ uint3 Compose(uint2 basePos) {
 
         // Skip normal shadow sprite layer pixels
         if (layer == kLayerSprite) {
-            const uint spriteAttrs = g_spriteAttrsIn[uint3(g_hiPos, 0)];
+            const uint spriteAttrs = g_spriteAttrs;
             if (BitExtract(spriteAttrs, kSpriteAttrBitSpecial, 2) != kSpriteDataNormal) {
                 continue;
             }
@@ -444,7 +449,7 @@ uint3 Compose(uint2 basePos) {
     const uint4 spriteOutput = GetLayerOutput(kLayerSprite, pos);
     const uint spritePriority = BitExtract(spriteOutput.a, 0, 3);
     if (spritePriority >= p0) {
-        const uint spriteAttrs = g_spriteAttrsIn[uint3(g_hiPos, 0)];
+        const uint spriteAttrs = g_spriteAttrs;
         const bool useSpriteWindow = BitTest(g_commonParams.spriteParams, 20);
         const bool isNormalShadow = BitExtract(spriteAttrs, kSpriteAttrBitSpecial, 2) == kSpriteDataShadow;
         const bool isMSBShadow = !useSpriteWindow && BitTest(spriteAttrs, kSpriteAttrBitShadowWindow);
@@ -499,15 +504,23 @@ uint3 Compose(uint2 basePos) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Entrypoint
 
-// TODO: 32 threads might be suboptimal on AMD GPUs
-[numthreads(32, 1, 1)]
+// 64 threads: mobile GPUs (Adreno, Mali) run waves of 64+ threads, so 32-thread groups left half of every wave idle.
+// Widths that are not a multiple of 64 run past the visible area into the padding of the output texture.
+[numthreads(64, 1, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID) {
+    uint outW, outH;
+    g_compositeOut.GetDimensions(outW, outH);
+    if (id.x >= outW) {
+        return;
+    }
     // With resolution scaling, id.xy covers the scaled area; drawCoord is the native (1x) position
     const uint2 hiPos = uint2(id.x, id.y + g_commonParams.startY * outScale);
     const uint2 drawCoord = hiPos / outScale;
     const uint2 nativeOut = uint2(drawCoord.x, GetOutputY(drawCoord.y));
     const uint2 outCoord = outScale > 1 ? hiPos : nativeOut;
     g_hiPos = outCoord;
+    g_spritePixel = g_layerIn[uint3(outCoord, kBGLayerSprite)];
+    g_spriteAttrs = g_spriteAttrsIn[uint3(outCoord, 0)];
     const uint3 outColor = Compose(drawCoord);
     g_compositeOut[outCoord] = float4(outColor / 255.0, 1.0f);
     if (firstInterlacedFrame && !deinterlace && IsInterlaced()) {

@@ -536,9 +536,15 @@ SpriteOutput DrawSprite(uint2 pos, uint2 outPos, uint2 hiPos, uint index) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Entrypoint
 
-// TODO: 32 threads might be suboptimal on AMD GPUs
-[numthreads(32, 1, 1)]
+// 64 threads: mobile GPUs (Adreno, Mali) run waves of 64+ threads, so 32-thread groups left half of every wave idle.
+// Widths that are not a multiple of 64 run past the visible area into the padding of the layer textures.
+[numthreads(64, 1, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID) {
+    uint outW, outH, outLayers;
+    g_layerOut.GetDimensions(outW, outH, outLayers);
+    if (id.x >= outW) {
+        return;
+    }
     // With resolution scaling, id.xy covers the scaled area; drawCoord is the native (1x) position
     const uint2 hiPos = uint2(id.x, id.y + g_commonParams.startY * outScale);
     const uint2 drawCoord = hiPos / outScale;

@@ -2888,7 +2888,7 @@ struct VulkanVDPRenderer::Impl {
         // Draw sprite layer
         if (auto result = Dispatch(vdp2.drawSpritePipe, frames.GetCurrentFrame().drawSpriteSet,
                                    {{&vdp2.cpuCommonRenderParams, sizeof(vdp2.cpuCommonRenderParams)}},
-                                   (HRes * S + 31) / 32, numLines * S, enhancements.transparentMeshes ? 2 : 1);
+                                   (HRes * S + 63) / 64, numLines * S, enhancements.transparentMeshes ? 2 : 1);
             !result) {
             devlog::warn<grp::dx12_vdp2>("Failed to draw VDP2 sprite layer: {}", result.Error().message);
         }
@@ -2948,7 +2948,7 @@ struct VulkanVDPRenderer::Impl {
         // Compose final image
         if (auto result = Dispatch(vdp2.composePipe, frames.GetCurrentFrame().composeSet,
                                    {{&vdp2.cpuCommonRenderParams, sizeof(vdp2.cpuCommonRenderParams)}},
-                                   (HRes * S + 31) / 32, numLines * S, 1);
+                                   (HRes * S + 63) / 64, numLines * S, 1); // 64-thread groups (cs_vdp2_compose)
             !result) {
             devlog::warn<grp::dx12_vdp2>("Failed to compose VDP2 layers: {}", result.Error().message);
         }

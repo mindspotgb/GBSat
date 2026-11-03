@@ -4359,7 +4359,7 @@ struct Direct3D12VDPRenderer::Impl {
         cmdList->SetComputeRoot32BitConstants(0, sizeof(vdp2.cpuCommonRenderParams) / sizeof(uint32),
                                               &vdp2.cpuCommonRenderParams, 0);
         cmdList->SetComputeRootDescriptorTable(1, frameCtx.drawSpriteDescs.GetGPUHandle());
-        cmdList->Dispatch((HRes + 31) / 32, numLines, enhancements.transparentMeshes ? 2 : 1);
+        cmdList->Dispatch((HRes + 63) / 64, numLines, enhancements.transparentMeshes ? 2 : 1); // 64-thread groups
 
         // ---------------------------------------------------------------------
 
@@ -4439,7 +4439,7 @@ struct Direct3D12VDPRenderer::Impl {
         cmdList->SetComputeRoot32BitConstants(0, sizeof(vdp2.cpuCommonRenderParams) / sizeof(uint32),
                                               &vdp2.cpuCommonRenderParams, 0);
         cmdList->SetComputeRootDescriptorTable(1, frameCtx.composeDescs.GetGPUHandle());
-        cmdList->Dispatch((HRes + 31) / 32, numLines, 1);
+        cmdList->Dispatch((HRes + 63) / 64, numLines, 1); // 64-thread groups (cs_vdp2_compose)
     }
 
     void VDP2RenderLine(uint32 y) {
