@@ -13,5 +13,5 @@ out = re.sub(r'^[ \t]*//@@COPY (\d+)-(\d+)@@', rep, tpl, flags=re.M)
 bad = [l for l in out.split('\n') if re.search(r'D3D12|cmdList|barrierTracker|ID3D12', l) and not l.lstrip().startswith('//')]
 if bad:
     print('D3D12 leftovers:\n' + '\n'.join(bad[:20])); sys.exit(1)
-open(base + 'vdp_renderer_hw_vulkan.cpp', 'w').write(out)
+open(base + 'vdp_renderer_hw_vulkan.cpp', 'w', newline='\n').write(out)  # LF on every OS (no CRLF from Windows)
 print('ok', len(out.split('\n')), 'lines')

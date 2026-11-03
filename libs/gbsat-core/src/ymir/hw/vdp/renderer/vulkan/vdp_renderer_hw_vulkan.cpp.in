@@ -383,7 +383,9 @@ struct VulkanVDPRenderer::Impl {
         uint32 width = 0, height = 0;
         VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     };
-    static constexpr uint32 kExternalFrameSlots = 4;
+    // One imported image per frame target slot of the app's presenter: at least its slot count (GBFrame glr::kTargetSlots,
+    // 5). A slot index beyond this array made the import fail and switched the zero-copy output off.
+    static constexpr uint32 kExternalFrameSlots = 8;
     std::array<AndroidFrameImage, kExternalFrameSlots> androidFrameImages{};
     bool androidHardwareBufferInterop = false;
     PFN_vkGetAndroidHardwareBufferPropertiesANDROID getAndroidHardwareBufferProperties = nullptr;
@@ -557,12 +559,21 @@ struct VulkanVDPRenderer::Impl {
         frameImage = {};
     }
 
+    // Takes ownership of the reference to `buffer` that FrameTargetAcquire returned (one per frame): a new import keeps
+    // it in the slot (released by DestroyAndroidFrameImage); when the slot already holds this buffer, or the import
+    // fails, it is released here. Keeping every per-frame reference leaked them and the buffers of old resolutions.
     bool ImportAndroidFrameImage(uint64 token, AHardwareBuffer *buffer, uint32 width, uint32 height) {
-        if (!androidHardwareBufferInterop || !buffer) return false;
+        if (!buffer) return false;
+        auto drop = [buffer] {
+            AHardwareBuffer_release(buffer);
+            return false;
+        };
+        if (!androidHardwareBufferInterop) return drop();
         const uint32 slot = (uint32)token;
-        if (slot >= androidFrameImages.size()) return false;
+        if (slot >= androidFrameImages.size()) return drop();
         AndroidFrameImage &target = androidFrameImages[slot];
         if (target.token == token && target.buffer == buffer && target.width == width && target.height == height) {
+            AHardwareBuffer_release(buffer); // the slot already holds a reference
             return true;
         }
         DestroyAndroidFrameImage(target);
@@ -570,7 +581,7 @@ struct VulkanVDPRenderer::Impl {
         AHardwareBuffer_Desc desc{};
         AHardwareBuffer_describe(buffer, &desc);
         if (desc.width != width || desc.height != height || desc.format != AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM) {
-            return false;
+            return drop();
         }
 
         VkAndroidHardwareBufferFormatPropertiesANDROID formatProps{
@@ -578,9 +589,11 @@ struct VulkanVDPRenderer::Impl {
         VkAndroidHardwareBufferPropertiesANDROID ahbProps{
             VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID};
         ahbProps.pNext = &formatProps;
+        // externalFormat is a driver-defined id that is never zero (Adreno reports 28 for RGBA8): it only matters when
+        // `format` is VK_FORMAT_UNDEFINED. Rejecting a non-zero value disabled the zero-copy output on every driver.
         if (getAndroidHardwareBufferProperties(device, buffer, &ahbProps) != VK_SUCCESS ||
-            formatProps.format != VK_FORMAT_R8G8B8A8_UNORM || formatProps.externalFormat != 0) {
-            return false;
+            formatProps.format != VK_FORMAT_R8G8B8A8_UNORM) {
+            return drop();
         }
 
         VkExternalMemoryImageCreateInfo externalImage{
@@ -600,7 +613,7 @@ struct VulkanVDPRenderer::Impl {
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         if (vkCreateImage(device, &imageInfo, nullptr, &target.image) != VK_SUCCESS) {
             DestroyAndroidFrameImage(target);
-            return false;
+            return drop();
         }
 
         VkMemoryRequirements requirements{};
@@ -609,7 +622,7 @@ struct VulkanVDPRenderer::Impl {
         const int memoryType = FindMemoryType(memoryTypeBits, 0);
         if (memoryType < 0) {
             DestroyAndroidFrameImage(target);
-            return false;
+            return drop();
         }
 
         VkMemoryDedicatedAllocateInfo dedicated{VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO};
@@ -625,11 +638,10 @@ struct VulkanVDPRenderer::Impl {
         if (vkAllocateMemory(device, &allocation, nullptr, &target.memory) != VK_SUCCESS ||
             vkBindImageMemory(device, target.image, target.memory, 0) != VK_SUCCESS) {
             DestroyAndroidFrameImage(target);
-            return false;
+            return drop();
         }
 
-        AHardwareBuffer_acquire(buffer);
-        target.buffer = buffer;
+        target.buffer = buffer; // keeps the caller's reference
         target.token = token;
         target.width = width;
         target.height = height;
