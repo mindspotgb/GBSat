@@ -27,16 +27,8 @@ GBSat is a Sega Saturn emulator for Android phones and handhelds, built with the
 
 ## Screenshots
 
-These screenshots show the app using real Saturn games and their actual cover art.
+These screenshots show real Saturn gameplay captured in GBSat.
 
-<p align="center">
-  <img src="docs/screenshots/menu.png" width="48%" alt="GBSat main menu on Retroid Pocket Nova">
-  <img src="docs/screenshots/settings-video.png" width="48%" alt="GBSat video settings on Retroid Pocket Nova">
-</p>
-<p align="center">
-  <img src="docs/screenshots/settings-performance.png" width="48%" alt="GBSat performance settings on Retroid Pocket Nova">
-  <img src="docs/screenshots/library.png" width="48%" alt="GBSat game library with real Saturn game covers">
-</p>
 <p align="center">
   <img src="docs/screenshots/gameplay-daytona.png" width="48%" alt="Daytona USA gameplay in GBSat">
   <img src="docs/screenshots/gameplay-virtua-fighter-2.png" width="48%" alt="Virtua Fighter 2 gameplay in GBSat">
