@@ -12,13 +12,13 @@ Vulkan rendering · Save states · RetroAchievements · Controller and touch inp
 
 </div>
 
-GBSat is an Android Sega Saturn emulator built around the [Ymir](https://github.com/StrikerX3/Ymir) core and the shared [GBFrame](https://github.com/mindspotgb/GBFrame) app framework. The repository contains the Android app, the Ymir revision used by it, and the dependencies needed to build the Android version.
+GBSat is a Sega Saturn emulator for Android phones and handhelds, built with the shared [GBFrame](https://github.com/mindspotgb/GBFrame) app framework. This repository contains the Android app, its emulation core, and the dependencies needed to build it.
 
 ## Highlights
 
 | | |
 | --- | --- |
-| 🎮 **Saturn emulation** | Ymir core, with Vulkan rendering and an OpenGL ES compatibility renderer |
+| 🎮 **Saturn emulation** | GBSat runs Sega Saturn games with Vulkan rendering and an OpenGL ES compatibility renderer |
 | 🕹️ **Built for handhelds** | Controller navigation and remapping, touch controls, and an in-game quick menu |
 | 💾 **Save states** | Automatic and manual states, screenshots, resume support, and data-folder backup workflows |
 | 🏆 **RetroAchievements and cheats** | Optional RetroAchievements support and per-game cheats |
@@ -30,14 +30,17 @@ GBSat is an Android Sega Saturn emulator built around the [Ymir](https://github.
 These screenshots show the app using real Saturn games and their actual cover art.
 
 <p align="center">
-  <img src="docs/screenshots/menu.png" width="32%" alt="GBSat main menu">
-  <img src="docs/screenshots/settings-video.png" width="32%" alt="GBSat video settings">
-  <img src="docs/screenshots/settings-performance.png" width="32%" alt="GBSat performance settings">
+  <img src="docs/screenshots/menu.png" width="48%" alt="GBSat main menu on Retroid Pocket Nova">
+  <img src="docs/screenshots/settings-video.png" width="48%" alt="GBSat video settings on Retroid Pocket Nova">
+</p>
+<p align="center">
+  <img src="docs/screenshots/settings-performance.png" width="48%" alt="GBSat performance settings on Retroid Pocket Nova">
+  <img src="docs/screenshots/gameplay.png" width="48%" alt="NiGHTS Into Dreams gameplay on Retroid Pocket Nova">
 </p>
 
 ## All features
 
-- **Emulation:** Ymir-based Sega Saturn emulation with a BIOS and common disc-image formats supplied by the user.
+- **Emulation:** Sega Saturn games with a BIOS and common disc-image formats supplied by the user.
 - **Video:** Vulkan renderer with enhanced internal resolution, OpenGL ES renderer for compatibility, 4:3/16:9/full-screen display modes, supported widescreen hacks, filters, and shaders.
 - **Audio and performance:** Audio controls, fast-forward, automatic frame skip, and device-aware per-game performance profiles.
 - **Input:** Physical controller support and button remapping, Saturn touch controls with configurable haptics, hotkeys, and a controller-friendly in-game quick menu.
@@ -76,7 +79,7 @@ For Windows local signing and build instructions, see [apps/android/README.md](a
 ## Project layout
 
 - `apps/android` — Android app, Kotlin/Compose UI, JNI bridge, and app assets.
-- `libs/gbsat-core` — Ymir Saturn emulation core used by this app.
+- `libs/gbsat-core` — Saturn emulation core used by GBSat.
 - `libs/gbframe` — shared Android UI and device framework, pinned as a Git submodule.
 - `vendor` — native dependencies pinned to the revisions used by the Android build.
 - `cmake`, `tools`, `.github/workflows` — native build support and Android CI/release workflows.
@@ -84,6 +87,10 @@ For Windows local signing and build instructions, see [apps/android/README.md](a
 ## Privacy
 
 GBSat has no ads or analytics. Optional network features and the data they use are described in the [privacy policy](PRIVACY.md). The app does not include BIOS files or games.
+
+## References
+
+GBSat includes the [Ymir](https://github.com/StrikerX3/Ymir) emulation core. See the repository's third-party notices for source revisions and license details.
 
 ## License and trademarks
 
