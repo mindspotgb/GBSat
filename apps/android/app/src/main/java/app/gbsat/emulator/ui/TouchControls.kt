@@ -128,8 +128,8 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
         Box(Modifier.align(Alignment.CenterStart).width(panelW).fillMaxHeight().then(panelBg)) {
             Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart))
             Box(Modifier.align(Alignment.Center).size(200.dp, 300.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                Box(Modifier.align(Alignment.TopCenter).padding(top = 40.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
-                Box(Modifier.align(Alignment.Center)) { DPadRing() }
+                Box(Modifier.align(Alignment.TopCenter).padding(top = 6.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
+                Box(Modifier.align(Alignment.Center).offset(y = 18.dp)) { DPadRing() }
                 Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Pill("FAST", GreyButton, a.onFast)
                     StartPill()
@@ -139,8 +139,8 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
         Box(Modifier.align(Alignment.CenterEnd).width(panelW).fillMaxHeight().then(panelBg)) {
             Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd))
             Box(Modifier.align(Alignment.Center).size(200.dp, 300.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                Box(Modifier.align(Alignment.TopCenter).padding(top = 40.dp)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
-                Box(Modifier.align(Alignment.Center)) { FaceRing() }
+                Box(Modifier.align(Alignment.TopCenter).padding(top = 6.dp)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
+                Box(Modifier.align(Alignment.Center).offset(y = 18.dp)) { FaceRing() }
                 Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Pill("FILTERS", GreyButton, a.onFilters)
                     Pill("MENU", GreyButton, a.onMenu)
