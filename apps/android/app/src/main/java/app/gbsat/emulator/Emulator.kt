@@ -172,6 +172,11 @@ object Emulator {
         frameSkip = v.frameSkip; sh2Cache = v.sh2Cache
         savePrefs(); applyOptions()
     }
+    /** The settings an app starts with: OpenGL (CPU) renderer, 1x, no shader, linear filter, frame skip off. */
+    fun applyDefaultSettings() {
+        renderer = 1; resScale = 1; shader = gb.frame.Shaders.NONE; filter = 1; frameSkip = false; sh2Cache = false
+        savePrefs(); applyOptions()
+    }
     var setupDone by mutableStateOf(true)
     fun finishSetup() { setupDone = true; prefs.edit().putBoolean("setupDone", true).apply() }
     var cdSpeed by mutableStateOf(8) // CD read speed factor (2 = original); 8x by default since streams switch back to 2x

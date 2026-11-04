@@ -28,8 +28,8 @@ fun SetupWizard(onFinish: () -> Unit) {
     val gamesPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         uri?.let { Storage.takeFolder(it); Emulator.gamesDir = it.toString(); Emulator.savePrefs(); message = null }
     }
-    // The video/performance preset is picked for the detected device (Settings → Performance shows which)
-    LaunchedEffect(Unit) { if (!Emulator.setupDone) Emulator.applyPreset(Emulator.recommendedPreset) }
+    // First run starts with the default settings; the device's recommended preset is only applied by the wizard's button
+    LaunchedEffect(Unit) { if (!Emulator.setupDone) Emulator.applyDefaultSettings() }
     gb.frame.SetupWizard(
         steps = listOf(
             WizardStep(Icons.Default.SportsEsports, "Welcome to GBSat", listOf(Color(0xFF8B7CFF), Color(0xFFE85CC4)),
@@ -46,7 +46,8 @@ fun SetupWizard(onFinish: () -> Unit) {
                 if (Emulator.gamesDir.isNotBlank()) WizardStatus(Storage.folderLabel(Emulator.gamesDir))
             },
             gb.frame.performanceWizardStep(Emulator.recommendedPreset.label,
-                Emulator.presetWizardOptions(Emulator.recommendedPreset)),
+                Emulator.presetWizardOptions(Emulator.recommendedPreset),
+                onApply = { Emulator.applyPreset(Emulator.recommendedPreset) }),
         ),
         onFinish = onFinish, message = message, onStepChange = { message = null },
     )
