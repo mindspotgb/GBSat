@@ -100,7 +100,7 @@ private fun PortraitPad(modifier: Modifier, a: PadActions) {
             Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart))
             Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd))
             Text(
-                "SEGA", color = LogoColor, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+                "SATURN", color = LogoColor, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
             )
             Box(Modifier.align(Alignment.Center).size(364.dp, 290.dp).graphicsLayer { scaleX = s; scaleY = s }) {
@@ -130,10 +130,10 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
         val s = minOf(1f, (panelW - maxOf(insetL, insetR)) / 200.dp, maxHeight / 340.dp).coerceAtLeast(0.5f)
         val panelBg = if (overlay) Modifier else Modifier.background(BodyColor)
         Box(Modifier.align(Alignment.CenterStart).width(panelW).fillMaxHeight().then(panelBg)) {
-            Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart).padding(top = 24.dp))
+            Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart).padding(top = 68.dp))
             Box(Modifier.fillMaxSize().padding(start = insetL)) {
                 Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                    Box(Modifier.align(Alignment.BottomCenter)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
+                    Box(Modifier.align(Alignment.BottomCenter).offset(y = 14.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
                     Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { DPadRing() }
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Pill("FAST", GreyButton, a.onFast)
@@ -143,10 +143,10 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
             }
         }
         Box(Modifier.align(Alignment.CenterEnd).width(panelW).fillMaxHeight().then(panelBg)) {
-            Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd).padding(top = 24.dp))
+            Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd).padding(top = 68.dp))
             Box(Modifier.fillMaxSize().padding(end = insetR)) {
                 Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                    Box(Modifier.align(Alignment.BottomCenter)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
+                    Box(Modifier.align(Alignment.BottomCenter).offset(y = 14.dp)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
                     Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { FaceRing() }
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Pill("FILTERS", GreyButton, a.onFilters)
