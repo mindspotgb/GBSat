@@ -2194,7 +2194,8 @@ void ApplyVdpRenderer(bool gpu, bool force = false) {
             pipelineCachePath = (std::filesystem::path(g->dataDir) / "cache" / "vulkan-pipelines.bin").string();
             std::error_code ec;
             std::filesystem::create_directories(std::filesystem::path(pipelineCachePath).parent_path(), ec);
-            ctx.pipelineCacheFile = pipelineCachePath.c_str();
+            // Disabled while a startup crash on one phone (build 6) is unexplained; re-enable once the cause is known.
+            // ctx.pipelineCacheFile = pipelineCachePath.c_str();
         }
         auto renderer = vdp.UseVulkanRenderer(ctx);
         result = static_cast<bool>(renderer);

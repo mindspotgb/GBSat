@@ -114,7 +114,7 @@ fun GameScreen(onQuitApp: () -> Unit) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 VideoSurface(videoMod.fillMaxHeight())
             }
-            if (touch) TouchControls(Modifier.fillMaxSize().safeDrawingPadding(), landscape = true)
+            if (touch) TouchControls(Modifier.fillMaxSize().safeDrawingPadding(), landscape = true, onMenu = { menu = true; Emulator.pause(true) }, videoRatio = ratio)
         } else {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 // Fullscreen fills the whole area above the touch controls (or the whole screen when they are hidden)
@@ -122,7 +122,7 @@ fun GameScreen(onQuitApp: () -> Unit) {
                 Box(Modifier.fillMaxWidth().weight(1f, fill = full), contentAlignment = Alignment.TopCenter) {
                     VideoSurface(if (full) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(ratio))
                 }
-                if (touch) TouchControls(Modifier.fillMaxWidth().weight(1f), landscape = false)
+                if (touch) TouchControls(Modifier.fillMaxWidth().weight(1f), landscape = false, onMenu = { menu = true; Emulator.pause(true) })
             }
         }
 
