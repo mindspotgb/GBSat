@@ -96,16 +96,16 @@ private fun PortraitPad(modifier: Modifier, a: PadActions) {
         BoxWithConstraints(
             Modifier.fillMaxWidth().weight(1f).background(BodyColor, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
         ) {
-            val s = minOf(1f, maxWidth / 380.dp, maxHeight / 300.dp).coerceAtLeast(0.5f)
+            val s = minOf(1.5f, maxWidth / 364.dp, maxHeight / 290.dp).coerceAtLeast(0.5f)
             Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart))
             Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd))
             Text(
                 "SEGA", color = LogoColor, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
             )
-            Box(Modifier.align(Alignment.Center).size(380.dp, 300.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                Box(Modifier.align(Alignment.TopStart).offset(x = 4.dp, y = 46.dp)) { DPadRing() }
-                Box(Modifier.align(Alignment.TopEnd).offset(x = (-4).dp, y = 46.dp)) { FaceRing() }
+            Box(Modifier.align(Alignment.Center).size(364.dp, 290.dp).graphicsLayer { scaleX = s; scaleY = s }) {
+                Box(Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 34.dp)) { DPadRing() }
+                Box(Modifier.align(Alignment.TopEnd).offset(x = (-8).dp, y = 34.dp)) { FaceRing() }
                 Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Pill("FAST", GreyButton, a.onFast)
                     Pill("MENU", GreyButton, a.onMenu)
@@ -133,9 +133,9 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
             Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart).padding(top = 24.dp))
             Box(Modifier.fillMaxSize().padding(start = insetL)) {
                 Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                    Box(Modifier.align(Alignment.TopCenter).padding(top = 70.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
-                    Box(Modifier.align(Alignment.Center).offset(y = 28.dp)) { DPadRing() }
-                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.align(Alignment.BottomCenter)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
+                    Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { DPadRing() }
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Pill("FAST", GreyButton, a.onFast)
                         StartPill()
                     }
@@ -146,9 +146,9 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
             Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd).padding(top = 24.dp))
             Box(Modifier.fillMaxSize().padding(end = insetR)) {
                 Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                    Box(Modifier.align(Alignment.TopCenter).padding(top = 70.dp)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
-                    Box(Modifier.align(Alignment.Center).offset(y = 28.dp)) { FaceRing() }
-                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.align(Alignment.BottomCenter)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
+                    Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { FaceRing() }
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Pill("FILTERS", GreyButton, a.onFilters)
                         Pill("MENU", GreyButton, a.onMenu)
                     }
@@ -170,18 +170,18 @@ private fun DPadRing() {
 @Composable
 private fun FaceRing() {
     Box(Modifier.size(170.dp).background(RingColor, CircleShape)) {
-        Face("X", SaturnButton.X, Modifier.offset(4.dp, 52.dp), GreyButton)
-        Face("Y", SaturnButton.Y, Modifier.offset(52.dp, 32.dp), GreyButton)
-        Face("Z", SaturnButton.Z, Modifier.offset(102.dp, 16.dp), GreyButton)
-        Face("A", SaturnButton.A, Modifier.offset(18.dp, 104.dp), Color(0xFF1FA050))
-        Face("B", SaturnButton.B, Modifier.offset(66.dp, 88.dp), Color(0xFFF2C21B))
-        Face("C", SaturnButton.C, Modifier.offset(114.dp, 72.dp), Color(0xFF2B45C8))
+        Face("X", SaturnButton.X, Modifier.offset(0.dp, 52.dp), GreyButton)
+        Face("Y", SaturnButton.Y, Modifier.offset(52.dp, 30.dp), GreyButton)
+        Face("Z", SaturnButton.Z, Modifier.offset(106.dp, 12.dp), GreyButton)
+        Face("A", SaturnButton.A, Modifier.offset(12.dp, 110.dp), Color(0xFF1FA050))
+        Face("B", SaturnButton.B, Modifier.offset(64.dp, 92.dp), Color(0xFFF2C21B))
+        Face("C", SaturnButton.C, Modifier.offset(118.dp, 72.dp), Color(0xFF2B45C8))
     }
 }
 
 @Composable
 private fun Face(label: String, b: SaturnButton, modifier: Modifier, tint: Color) =
-    PressArea("face-$label", { down -> TouchState.set(b, if (down) b.bit else 0) }, modifier.size(46.dp)) { pressed ->
+    PressArea("face-$label", { down -> TouchState.set(b, if (down) b.bit else 0) }, modifier.size(52.dp)) { pressed ->
         Box(
             Modifier.fillMaxSize()
                 .background(Brush.verticalGradient(listOf(tint.lighten(.25f), tint.darken(if (pressed) .25f else .08f))), CircleShape)
@@ -280,7 +280,7 @@ private fun DPad() = TouchDPad(
         TouchState.set("dpad", mask)
     },
     hapticsEnabled = Emulator.touchHapticsEnabled,
-    modifier = Modifier.size(150.dp),
+    modifier = Modifier.size(164.dp),
     track = Color(0xFF111112), normal = Color(0xFF1B1B1D), selected = Color(0xFF4A4A4E),
     center = Color(0xFF0A0A0B), arrow = Color(0xFF8A8A8E), border = Color.White.copy(alpha = .08f),
 )
