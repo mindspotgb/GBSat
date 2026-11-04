@@ -100,15 +100,10 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
                             Screen.Library -> LibraryScreen(
                                 onOpenSettings = { settingsPage = it; screen = Screen.Settings },
                                 onQuit = onQuitApp,
-                                launch = { path ->
-                                    scope.launch {
-                                        Emulator.launch(path)?.let { snackbar.showSnackbar(it) }
-                                    }
-                                },
-                                launchState = { st ->
-                                    scope.launch { Emulator.launchState(st)?.let { snackbar.showSnackbar(it) } }
-                                },
-                                open = { path -> scope.launch { Emulator.launch(path, useAutoLoad = false)?.let { snackbar.showSnackbar(it) } } },
+                                launch = { path, progress -> Emulator.launch(path, onArchiveProgress = progress) },
+                                launchState = { st, progress -> Emulator.launchState(st, progress) },
+                                open = { path, progress -> Emulator.launch(path, useAutoLoad = false, onArchiveProgress = progress) },
+                                onLaunchError = { message -> scope.launch { snackbar.showSnackbar(message) } },
                                 visualCustomizationProductId = "gbsat_gold",
                             )
                             Screen.Settings -> SettingsScreen(

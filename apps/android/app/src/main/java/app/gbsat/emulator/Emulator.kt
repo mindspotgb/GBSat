@@ -389,8 +389,11 @@ object Emulator {
     }
 
     /** Starts a game and loads one of its save states. Returns an error message or null. */
-    suspend fun launchState(s: RecentState): String? {
-        launch(s.gamePath, useAutoLoad = false)?.let { return it }
+    suspend fun launchState(
+        s: RecentState,
+        onArchiveProgress: (gb.frame.DiscArchiveProgress) -> Unit = {},
+    ): String? {
+        launch(s.gamePath, useAutoLoad = false, onArchiveProgress = onArchiveProgress)?.let { return it }
         return loadState(s.slot)
     }
 
@@ -621,14 +624,18 @@ object Emulator {
         }.maxByOrNull { it.time }
     }
 
-    suspend fun launch(path: String, useAutoLoad: Boolean = true): String? = withContext(Dispatchers.IO) {
+    suspend fun launch(
+        path: String,
+        useAutoLoad: Boolean = true,
+        onArchiveProgress: (gb.frame.DiscArchiveProgress) -> Unit = {},
+    ): String? = withContext(Dispatchers.IO) {
         quitJob?.join() // a quit still saving closes its game first
         if (!iplLoaded) return@withContext "Load a Saturn BIOS (IPL ROM) in Settings first."
         rememberScspMode() // a game was still running
         openDisc?.close()
         android.util.Log.i("GBSat-Disc", "launch requested path=" + path + "; name=" + Storage.fileName(path))
         // The kit opens the disc and retries from a copy when the core can't read it through the descriptor (SafGames)
-        val loaded = Storage.openAndLoad(path) { disc ->
+        val loaded = Storage.openAndLoad(path, onArchiveProgress) { disc ->
             android.util.Log.i("GBSat-Disc", "calling nativeLoadDisc path=" + disc.path)
             NativeBridge.nativeLoadDisc(disc.path)
                 .also { android.util.Log.i("GBSat-Disc", "nativeLoadDisc result=" + (it ?: "success")) }

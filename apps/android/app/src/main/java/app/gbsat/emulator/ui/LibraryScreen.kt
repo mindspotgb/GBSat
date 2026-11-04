@@ -53,10 +53,11 @@ import kotlinx.coroutines.withContext
 @Composable
 fun LibraryScreen(
     onOpenSettings: (SettingsPage?) -> Unit,
-    launch: (String) -> Unit,
-    launchState: (Emulator.RecentState) -> Unit,
+    launch: suspend (String, (DiscArchiveProgress) -> Unit) -> String?,
+    launchState: suspend (Emulator.RecentState, (DiscArchiveProgress) -> Unit) -> String?,
     onQuit: () -> Unit,
-    open: (String) -> Unit = launch,
+    onLaunchError: (String) -> Unit,
+    open: suspend (String, (DiscArchiveProgress) -> Unit) -> String? = launch,
     visualCustomizationProductId: String? = null,
 ) {
     val ctx = LocalContext.current
@@ -102,6 +103,7 @@ fun LibraryScreen(
     var games by remember { mutableStateOf(Storage.cachedScan(Emulator.gamesDir)) }
     var loading by remember { mutableStateOf(games.isEmpty() && Emulator.gamesDir.isNotBlank()) }
     var openingGame by remember { mutableStateOf(false) }
+    var archiveProgress by remember { mutableStateOf<DiscArchiveProgress?>(null) }
     var refreshKey by remember { mutableIntStateOf(0) }
     var states by remember { mutableStateOf(Emulator.lastRecentStates) }
     LifecycleResumeEffect(Unit) { refreshKey++; onPauseOrDispose { } }
@@ -144,22 +146,17 @@ fun LibraryScreen(
         LibraryBack.handle { if (achievementsFor != null) { achievementsFor = null; true } else false }
     }
 
-    fun showLaunchLoading(action: () -> Unit) {
+    fun showLaunchLoading(action: suspend ((DiscArchiveProgress) -> Unit) -> String?) {
         if (openingGame) return
         openingGame = true
-        action()
+        archiveProgress = null
         scope.launch {
-            // The launch callback starts the emulator coroutine. Keep the input-blocking overlay until the
-            // emulator reports that it is running; the timeout also lets the library recover after a failed launch.
-            repeat(900) {
-                if (Emulator.running) {
-                    delay(350)
-                    openingGame = false
-                    return@launch
-                }
-                delay(100)
-            }
+            val error = runCatching { action { progress -> archiveProgress = progress } }
+                .fold({ it }, { it.message ?: "Unable to open the game." })
+            if (Emulator.running) delay(350)
+            archiveProgress = null
             openingGame = false
+            error?.let(onLaunchError)
         }
     }
     val openPage: (SettingsPage) -> Unit = {
@@ -168,10 +165,10 @@ fun LibraryScreen(
         onOpenSettings(it)
     }
     val actions = HomeActions(
-        play = { LibraryView.lastGame = it.key; MenuState.selected = null; showLaunchLoading { launch(it.key) } },
-        fresh = { LibraryView.lastGame = it.key; MenuState.selected = null; showLaunchLoading { open(it.key) } },
+        play = { LibraryView.lastGame = it.key; MenuState.selected = null; showLaunchLoading { progress -> launch(it.key, progress) } },
+        fresh = { LibraryView.lastGame = it.key; MenuState.selected = null; showLaunchLoading { progress -> open(it.key, progress) } },
         options = { if (!openingGame) gameMenu = it },
-        resume = { e -> states.firstOrNull { it.gamePath + "#" + it.slot == e.key }?.let { LibraryView.lastGame = it.gamePath; MenuState.selected = null; showLaunchLoading { launchState(it) } } },
+        resume = { e -> states.firstOrNull { it.gamePath + "#" + it.slot == e.key }?.let { LibraryView.lastGame = it.gamePath; MenuState.selected = null; showLaunchLoading { progress -> launchState(it, progress) } } },
         openMenu = { menuOpen = true },
     )
     val toSystem = { openPage(SettingsPage.System) }
@@ -234,7 +231,11 @@ fun LibraryScreen(
             onQuit = onQuit, header = { RaUserHeader() }, onFocusChanged = { MenuState.menuHasFocus = it },
         )
         if (openingGame) {
-            gb.frame.LaunchLoadingOverlay("Preparing the disc image. The first launch may take a little longer.")
+            gb.frame.LaunchLoadingOverlay(
+                "The first opening of a large archive can take a few minutes. The screen will stay on while it loads.",
+                extractionProgress = archiveProgress?.fraction,
+                extractingArchive = archiveProgress != null,
+            )
         }
         visualCustomizationProductId?.let { VisualCustomizationPurchaseHost("GBSat", it) }
         gameMenu?.let { g -> GameOptions(g, entries.firstOrNull { it.game == g.key },
