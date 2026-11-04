@@ -122,8 +122,8 @@ fun GameScreen(onQuitApp: () -> Unit) {
         } else if (!kitTouchLayout) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 if (touch) {
-                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
-                        VideoSurface(if (Emulator.aspect == 1) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(ratio))
+                    Box(Modifier.fillMaxWidth().aspectRatio(ratio), contentAlignment = Alignment.TopCenter) {
+                        VideoSurface(Modifier.fillMaxSize())
                     }
                     TouchControls(
                         Modifier.fillMaxWidth().weight(1f), landscape = false, responsiveLayout = false,
@@ -151,6 +151,7 @@ fun GameScreen(onQuitApp: () -> Unit) {
         // achievement notifications and toasts, placed the same way in every app
         GameplayOverlayChrome(
             onMenu = { menu = true; Emulator.pause(true) },
+            controlsProvideMenuAndFastForward = touch,
             showFastForwardButton = Emulator.showFfButton, fastForward = Emulator.fastForward,
             onFastForward = { Emulator.toggleFastForward() },
             skipping = skipping,

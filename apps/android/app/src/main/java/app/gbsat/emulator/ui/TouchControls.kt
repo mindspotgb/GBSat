@@ -128,8 +128,7 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
             StateAction("SAVE", Icons.Default.Download, a.onSave)
         }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
-            val w = minOf(maxWidth, maxHeight * (480f / 615f))
-            ArtworkPanel(Modifier.width(w).height(w * (615f / 480f)), R.drawable.saturn_panel_portrait, 0, a)
+            ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_panel_portrait, 0, a)
         }
     }
 }
@@ -141,9 +140,8 @@ private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions)
         if (Emulator.aspect == 1 || side < 100.dp) {
             LegacyLandscapePad(Modifier.fillMaxSize(), ratio, a)
         } else {
-            val h = minOf(maxHeight, side * (400f / 232f))
-            ArtworkPanel(Modifier.align(Alignment.CenterStart).width(side).height(h), R.drawable.saturn_panel_left, 1, a)
-            ArtworkPanel(Modifier.align(Alignment.CenterEnd).width(side).height(h), R.drawable.saturn_panel_right, 2, a)
+            ArtworkPanel(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight(), R.drawable.saturn_panel_left, 1, a)
+            ArtworkPanel(Modifier.align(Alignment.CenterEnd).width(side).fillMaxHeight(), R.drawable.saturn_panel_right, 2, a)
         }
     }
 }
@@ -156,7 +154,12 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         Image(painterResource(art), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
         @Composable fun button(x: Float, y: Float, bw: Float, bh: Float, key: String, onPressed: (Boolean) -> Unit) {
             PressArea(key, onPressed, Modifier.offset(x = w * (x - bw / 2), y = h * (y - bh / 2)).size(w * bw, h * bh)) { down ->
-                if (down) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = .22f), CircleShape))
+                val amount by animateFloatAsState(if (down) 1f else 0f, tween(if (down) 65 else 140), label = key)
+                Box(Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = 1f - amount * .08f
+                    scaleY = 1f - amount * .08f
+                    alpha = amount
+                }.background(Color.Black.copy(alpha = .34f), CircleShape).border(1.dp, Color.White.copy(alpha = .38f), CircleShape))
             }
         }
         @Composable fun saturn(x: Float, y: Float, bw: Float, bh: Float, b: SaturnButton) {
@@ -166,7 +169,11 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
             button(x, y, bw, bh, "art-$panel-$key") { down -> if (down) run() }
         }
         @Composable fun directions(x: Float, y: Float, size: Float) {
+            var active by remember { mutableStateOf(emptySet<TouchDirection>()) }
+            val glow by animateFloatAsState(if (active.isEmpty()) 0f else 1f, tween(100), label = "saturn-direction")
+            Box(Modifier.offset(x = w * (x - size / 2), y = h * (y - size * (w.value / h.value) / 2)).size(w * size)) {
             TouchDPad(onDirectionsChanged = { dirs ->
+                active = dirs
                 TouchState.set("dpad", dirs.fold(0) { bits, direction -> bits or when (direction) {
                     TouchDirection.UP -> SaturnButton.Up.bit
                     TouchDirection.DOWN -> SaturnButton.Down.bit
@@ -174,9 +181,18 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                     TouchDirection.RIGHT -> SaturnButton.Right.bit
                 } })
             }, hapticsEnabled = Emulator.touchHapticsEnabled,
-                modifier = Modifier.offset(x = w * (x - size / 2), y = h * (y - size * (w.value / h.value) / 2)).size(w * size),
-                track = Color.Transparent, normal = Color.Transparent, selected = Color.White.copy(alpha = .22f),
+                modifier = Modifier.fillMaxSize(),
+                track = Color.Transparent, normal = Color.Transparent, selected = Color.Transparent,
                 center = Color.Transparent, arrow = Color.Transparent, border = Color.Transparent)
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val tint = Color.White.copy(alpha = .38f * glow)
+                val radius = this.size.minDimension * .11f
+                if (TouchDirection.UP in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .20f))
+                if (TouchDirection.DOWN in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .80f))
+                if (TouchDirection.LEFT in active) drawCircle(tint, radius, Offset(this.size.width * .20f, this.size.height * .5f))
+                if (TouchDirection.RIGHT in active) drawCircle(tint, radius, Offset(this.size.width * .80f, this.size.height * .5f))
+            }
+            }
         }
         if (panel == 0) {
             saturn(.17f,.10f,.24f,.12f,SaturnButton.L); saturn(.83f,.10f,.24f,.12f,SaturnButton.R)
