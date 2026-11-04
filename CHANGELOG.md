@@ -8,6 +8,11 @@
 - Auto frame skip starts earlier on the CPU renderer, compares three-second windows from similar VDP1 scene loads, increases skip cadence after repeatable savings, and retries after a five-second pause when skipping hurts. Vulkan thresholds remain unchanged.
 - Reduce SH-2 JIT code-write watch overhead for writes that do not overlap compiled code.
 - Add a persistent toggle for built-in Saturn widescreen game hacks in Video settings and the in-game Video menu.
+- Update check at startup and in About (Check for updates): Google Play In-App Updates on Play installs, the latest verified GitHub release (package, signature, SHA-256, Android install confirmation) everywhere else.
+- New Saturn pad for the touch controls (portrait and landscape) with LOAD/SAVE quick states, FAST, FILTERS and MENU; the system bars stay visible without a physical controller and hide only in games.
+- Resolution options come from the kit: 1x to 4x plus Best, which scales to the real display of the device.
+- Vulkan pipelines are cached between starts (dropped automatically if a previous run crashed while using the cache).
+- Quick menu is narrower and shorter in portrait; the purchase dialog is now "GBSat - PRO", centered and translated.
 
 ## 1.3.7
 - Library: closing the Exit dialog with Back or B no longer changes the selected game (it moved two covers to the left).
