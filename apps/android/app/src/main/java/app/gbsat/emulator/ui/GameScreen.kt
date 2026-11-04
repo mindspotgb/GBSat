@@ -106,6 +106,7 @@ fun GameScreen(onQuitApp: () -> Unit) {
         (Emulator.touchControlsMode == gb.frame.TouchControlsMode.AUTO && !hasPad)
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val landscape = maxWidth > maxHeight
+        val kitTouchLayout = gb.frame.TouchControlsLayoutPlanner.usesResponsiveLayout(maxWidth.value, maxHeight.value)
         val ratio = if (Emulator.aspect == 2) 16f / 9f else 4f / 3f
         val videoMod = if (Emulator.aspect == 1) Modifier.fillMaxSize() else Modifier.aspectRatio(ratio)
 
@@ -114,13 +115,35 @@ fun GameScreen(onQuitApp: () -> Unit) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 VideoSurface(videoMod.fillMaxHeight())
             }
-            if (touch) TouchControls(Modifier.fillMaxSize(), landscape = true, onMenu = { menu = true; Emulator.pause(true) }, videoRatio = ratio)
+            if (touch) TouchControls(
+                Modifier.fillMaxSize(), landscape = true, responsiveLayout = kitTouchLayout,
+                onMenu = { menu = true; Emulator.pause(true) }, videoRatio = ratio,
+            )
+        } else if (!kitTouchLayout) {
+            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                if (touch) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
+                        VideoSurface(if (Emulator.aspect == 1) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(ratio))
+                    }
+                    TouchControls(
+                        Modifier.fillMaxWidth().weight(1f), landscape = false, responsiveLayout = false,
+                        onMenu = { menu = true; Emulator.pause(true) },
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                        VideoSurface(if (Emulator.aspect == 1) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(ratio))
+                    }
+                }
+            }
         } else {
             Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
                 // Keep the game at its normal size; the transparent touch layer overlays it instead of reserving height.
                 val full = Emulator.aspect == 1
                 VideoSurface(if (full) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(ratio))
-                if (touch) TouchControls(Modifier.fillMaxSize(), landscape = false, onMenu = { menu = true; Emulator.pause(true) })
+                if (touch) TouchControls(
+                    Modifier.fillMaxSize(), landscape = false, responsiveLayout = true,
+                    onMenu = { menu = true; Emulator.pause(true) },
+                )
             }
         }
 

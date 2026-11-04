@@ -68,7 +68,13 @@ private class PadActions(
  * the bottom; landscape controls anchor to the lower screen edges. LOAD/SAVE use the quick-save slot.
  */
 @Composable
-fun TouchControls(modifier: Modifier, landscape: Boolean, onMenu: () -> Unit = {}, videoRatio: Float = 4f / 3f) {
+fun TouchControls(
+    modifier: Modifier,
+    landscape: Boolean,
+    responsiveLayout: Boolean = true,
+    onMenu: () -> Unit = {},
+    videoRatio: Float = 4f / 3f,
+) {
     val scope = rememberCoroutineScope()
     val actions = PadActions(
         onLoad = { scope.launch { Emulator.showToast(Emulator.loadState(Emulator.QUICK_SLOT) ?: "Quick loaded") } },
@@ -82,13 +88,85 @@ fun TouchControls(modifier: Modifier, landscape: Boolean, onMenu: () -> Unit = {
         },
         onMenu = onMenu,
     )
-    TouchControlsOverlay(
-        modifier = modifier,
-        referenceWidth = if (landscape) 720.dp else 480.dp,
-        referenceHeight = if (landscape) 720.dp else 960.dp,
-    ) { layout ->
-        if (landscape) LandscapePad(Modifier.fillMaxSize(), videoRatio, actions, layout)
-        else PortraitPad(Modifier.fillMaxSize(), actions, layout)
+    if (responsiveLayout) {
+        TouchControlsOverlay(
+            modifier = modifier,
+            referenceWidth = if (landscape) 720.dp else 480.dp,
+            referenceHeight = if (landscape) 720.dp else 960.dp,
+            videoAspectRatio = videoRatio,
+        ) { layout ->
+            if (landscape) LandscapePad(Modifier.fillMaxSize(), videoRatio, actions, layout)
+            else PortraitPad(Modifier.fillMaxSize(), actions, layout)
+        }
+    } else if (landscape) {
+        LegacyLandscapePad(modifier, videoRatio, actions)
+    } else {
+        LegacyPortraitPad(modifier, actions)
+    }
+}
+
+/** Original phone portrait arrangement: reserve a generous lower half for controls instead of shrinking them to the screen edge. */
+@Composable
+private fun LegacyPortraitPad(modifier: Modifier, a: PadActions) {
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth().height(48.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            StateAction("LOAD", Icons.Default.Refresh, a.onLoad)
+            StateAction("SAVE", Icons.Default.Download, a.onSave)
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            val s = minOf(1.15f, maxWidth / 364.dp, maxHeight / 290.dp).coerceAtLeast(.72f)
+            Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart))
+            Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd))
+            Text("SATURN", color = LogoColor, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
+            Box(Modifier.align(Alignment.Center).size(364.dp, 290.dp).graphicsLayer { scaleX = s; scaleY = s }) {
+                Box(Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 34.dp)) { DPadRing() }
+                Box(Modifier.align(Alignment.TopEnd).offset(x = (-8).dp, y = 34.dp)) { FaceRing() }
+                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Pill("FAST", GreyButton, a.onFast)
+                    Pill("MENU", GreyButton, a.onMenu)
+                    StartPill()
+                }
+            }
+        }
+    }
+}
+
+/** Original landscape phone layout scales from the side panels, not from the entire screen height. */
+@Composable
+private fun LegacyLandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
+    BoxWithConstraints(modifier) {
+        val full = Emulator.aspect == 1
+        val side = if (full) 0.dp else ((maxWidth - maxHeight * ratio) / 2).coerceAtLeast(0.dp)
+        val overlay = full || side < 120.dp
+        val panelW = if (overlay) 200.dp else side
+        val s = minOf(1f, panelW / 200.dp, maxHeight / 340.dp).coerceAtLeast(.62f)
+        Box(Modifier.align(Alignment.CenterStart).width(panelW).fillMaxHeight()) {
+            Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart).padding(top = 68.dp))
+            Box(Modifier.fillMaxSize()) {
+                Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
+                    Box(Modifier.align(Alignment.BottomCenter).offset(y = 14.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
+                    Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { DPadRing() }
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Pill("FAST", GreyButton, a.onFast)
+                        StartPill()
+                    }
+                }
+            }
+        }
+        Box(Modifier.align(Alignment.CenterEnd).width(panelW).fillMaxHeight()) {
+            Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd).padding(top = 68.dp))
+            Box(Modifier.fillMaxSize()) {
+                Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
+                    Box(Modifier.align(Alignment.BottomCenter).offset(y = 14.dp)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
+                    Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { FaceRing() }
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Pill("FILTERS", GreyButton, a.onFilters)
+                        Pill("MENU", GreyButton, a.onMenu)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -148,7 +226,7 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions, layout
     val side = if (full) 0.dp else ((layout.screenWidth - layout.screenHeight * ratio) / 2).coerceAtLeast(0.dp)
     val overlay = full || side < 120.dp
     val panelW = if (overlay) 200.dp else side
-    val s = minOf(layout.scale, panelW / 200.dp).coerceAtLeast(0.35f)
+    val s = minOf(1f, panelW / 200.dp, layout.screenHeight / 340.dp).coerceAtLeast(0.62f)
     Box(modifier) {
         Box(Modifier.align(Alignment.BottomStart).width(panelW).fillMaxHeight()) {
             Box(
