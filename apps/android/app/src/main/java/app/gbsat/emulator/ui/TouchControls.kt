@@ -118,11 +118,9 @@ private fun PortraitPad(modifier: Modifier, a: PadActions) {
 
 @Composable
 private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val insets = WindowInsets.safeDrawing
-    // Camera cutout / rounded corners on the outer sides: panels reach the screen edge, their content stays clear of it
-    val insetL = with(density) { insets.getLeft(density, androidx.compose.ui.unit.LayoutDirection.Ltr).toDp() }
-    val insetR = with(density) { insets.getRight(density, androidx.compose.ui.unit.LayoutDirection.Ltr).toDp() }
+    // Full screen: the panels ignore the camera cutout and reach the screen edges
+    val insetL = 0.dp
+    val insetR = 0.dp
     BoxWithConstraints(modifier) {
         val full = Emulator.aspect == 1
         // The picture is centered on the whole screen, so each side panel is half of what it leaves free
