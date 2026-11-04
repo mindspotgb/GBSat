@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -343,12 +345,17 @@ private fun FaceRing() {
 @Composable
 private fun Face(label: String, b: SaturnButton, modifier: Modifier, tint: Color) =
     PressArea("face-$label", { down -> TouchState.set(b, if (down) b.bit else 0) }, modifier.size(52.dp)) { pressed ->
-        Box(
-            Modifier.fillMaxSize()
-                .background(Brush.verticalGradient(listOf(tint.lighten(.25f), tint.darken(if (pressed) .25f else .08f))), CircleShape)
-                .border(1.dp, Color.Black.copy(alpha = .25f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) { Text(label, color = tint.darken(.45f), fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        val scale by animateFloatAsState(if (pressed) .88f else 1f, tween(75), label = "saturn-$label")
+        val image = when (label) {
+            "X" -> R.drawable.saturn_skin_x
+            "Y" -> R.drawable.saturn_skin_y
+            "Z" -> R.drawable.saturn_skin_z
+            "A" -> R.drawable.saturn_skin_a
+            "B" -> R.drawable.saturn_skin_b
+            else -> R.drawable.saturn_skin_c
+        }
+        Image(painterResource(image), contentDescription = label,
+            modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .8f else 1f })
     }
 
 @Composable
@@ -357,7 +364,7 @@ private fun Lobe(label: String, b: SaturnButton, left: Boolean, modifier: Modifi
         if (left) RoundedCornerShape(topStart = 28.dp, bottomEnd = 44.dp) else RoundedCornerShape(topEnd = 28.dp, bottomStart = 44.dp)
     PressArea("lobe-$label", { down -> TouchState.set(b, if (down) b.bit else 0) }, modifier.size(width = 104.dp, height = 46.dp)) { pressed ->
         Box(
-            Modifier.fillMaxSize().background(if (pressed) Crimson.darken(.2f) else Crimson, shape),
+            Modifier.fillMaxSize().background(if (pressed) Color(0xFF3A3E45) else Color(0xFF626870), shape),
             contentAlignment = if (left) Alignment.CenterStart else Alignment.CenterEnd,
         ) {
             Text(label, color = Color.Black.copy(alpha = .35f), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 18.dp))
@@ -451,7 +458,7 @@ private fun DPad() {
         center = Color.Transparent, arrow = Color.Transparent, border = Color.Transparent,
     )
     Image(
-        painter = painterResource(R.drawable.saturn_dpad),
+        painter = painterResource(R.drawable.saturn_skin_dpad),
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier = Modifier.fillMaxSize(),
