@@ -292,10 +292,10 @@ private fun GameOptions(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(g.title, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
+        title = { gb.frame.KitText(g.title, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) },
         text = {
             Column {
-                Text(if (g.playSeconds >= 60) "Played ${formatPlayTime(g.playSeconds)}" else "Not played yet", style = MaterialTheme.typography.bodyMedium)
+                gb.frame.KitText(if (g.playSeconds >= 60) "Played ${formatPlayTime(g.playSeconds)}" else "Not played yet", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(12.dp))
                 GameOptionsActionRow(Icons.Default.PlayCircle, if (latest != null) "Continue" else "Continue (no save state)", enabled = latest != null) {
                     latest?.let(onContinue)
@@ -318,9 +318,9 @@ fun EmptyState(icon: ImageVector, title: String, body: String, action: String?, 
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Icon(icon, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(16.dp))
-        Text(title, style = MaterialTheme.typography.titleLarge, color = Color.White)
+        gb.frame.KitText(title, style = MaterialTheme.typography.titleLarge, color = Color.White)
         Spacer(Modifier.height(8.dp))
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = .7f))
-        if (action != null) { Spacer(Modifier.height(24.dp)); Button(onClick = onAction) { Text(action) } }
+        gb.frame.KitText(body, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = .7f))
+        if (action != null) { Spacer(Modifier.height(24.dp)); Button(onClick = onAction) { gb.frame.KitText(action) } }
     }
 }

@@ -211,7 +211,7 @@ object Emulator {
     private var toastJob: kotlinx.coroutines.Job? = null
 
     fun showToast(msg: String) {
-        toast = msg
+        toast = if (::appContext.isInitialized) gb.frame.localizeAppText(appContext, msg) else msg
         toastJob?.cancel()
         toastJob = scope.launch { delay(2000); toast = null }
     }

@@ -342,8 +342,8 @@ private fun GameMenu(onDismiss: () -> Unit) {
             }
 
             when {
-                loading -> Text("Scanning game folder…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                candidates.isEmpty() -> Text(
+                loading -> gb.frame.KitText("Scanning game folder…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                candidates.isEmpty() -> gb.frame.KitText(
                     "No other discs for this game were found in the library.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -369,7 +369,7 @@ private fun GameMenu(onDismiss: () -> Unit) {
                     }
                 }
             }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            error?.let { gb.frame.KitText(it, color = MaterialTheme.colorScheme.error) }
         }
     }
     val gamePage = remember(cheatsPage, achievementsPage, swapDiscPage) {
@@ -461,6 +461,6 @@ private fun StateSlots(save: Boolean, onDone: () -> Unit) {
         )
     }
     message?.let {
-        Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp))
+        gb.frame.KitText(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp))
     }
 }

@@ -19,6 +19,7 @@ private enum class Screen { Library, Settings }
 
 @Composable
 fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     GBSatTheme {
         if (!Emulator.initialized && Emulator.initializationError == null) {
             gb.frame.AppStartScreen(app.gbsat.emulator.R.drawable.ic_launcher_foreground)
@@ -28,7 +29,7 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
             Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                 Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (Emulator.initializationError == null) CircularProgressIndicator()
-                    Text(Emulator.initializationError ?: "Opening data folder…")
+                    gb.frame.KitText(Emulator.initializationError ?: "Opening data folder…")
                     if (Emulator.initializationError != null) gb.frame.DataFolderControls(Emulator.dataFolder)
                 }
             }
@@ -56,7 +57,7 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
                 // Another game running: close it the way Exit does (auto save, back to the global options) first
                 if (game != null && Emulator.running) Emulator.endGame()
                 val err = if (game == null) gb.frame.LaunchIntent.notFound(requested) else Emulator.launch(game.path)
-                err?.let { if (Emulator.running) Emulator.showToast(it) else snackbar.showSnackbar(it) }
+                err?.let { if (Emulator.running) Emulator.showToast(it) else snackbar.showSnackbar(gb.frame.localizeAppText(context, it)) }
             }
         }
 
@@ -66,16 +67,16 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
             val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
             AlertDialog(
                 onDismissRequest = { Emulator.lastCrash = null },
-                title = { Text("Crash report") },
+                title = { gb.frame.KitText("Crash report") },
                 text = {
                     androidx.compose.foundation.text.selection.SelectionContainer {
-                        Text(report, style = MaterialTheme.typography.bodySmall,
+                        gb.frame.KitText(report, style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()))
                     }
                 },
-                confirmButton = { TextButton(onClick = { Emulator.lastCrash = null }) { Text("OK") } },
+                confirmButton = { TextButton(onClick = { Emulator.lastCrash = null }) { gb.frame.KitText("OK") } },
                 dismissButton = {
-                    TextButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(report)) }) { Text("Copy") }
+                    TextButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(report)) }) { gb.frame.KitText("Copy") }
                 },
             )
         }
@@ -103,7 +104,7 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
                                 launch = { path, progress -> Emulator.launch(path, onArchiveProgress = progress) },
                                 launchState = { st, progress -> Emulator.launchState(st, progress) },
                                 open = { path, progress -> Emulator.launch(path, useAutoLoad = false, onArchiveProgress = progress) },
-                                onLaunchError = { message -> scope.launch { snackbar.showSnackbar(message) } },
+                                onLaunchError = { message -> scope.launch { snackbar.showSnackbar(gb.frame.localizeAppText(context, message)) } },
                                 visualCustomizationProductId = "gbsat_gold",
                             )
                             Screen.Settings -> SettingsScreen(
@@ -115,7 +116,7 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
                                         MenuState.menuRefocus.intValue++
                                     }
                                 },
-                                toast = { msg -> scope.launch { snackbar.showSnackbar(msg) } },
+                                toast = { msg -> scope.launch { snackbar.showSnackbar(gb.frame.localizeAppText(context, msg)) } },
                                 page = settingsPage,
                             )
                         }

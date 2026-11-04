@@ -37,12 +37,12 @@ fun SetupWizard(onFinish: () -> Unit) {
             gb.frame.dataFolderWizardStep(Emulator.dataFolder),
             WizardStep(Icons.Default.Memory, "Saturn BIOS", listOf(Color(0xFFFFB347), Color(0xFFFF6B6B)),
                 "GBSat needs your own Saturn BIOS (IPL ROM, 512 KiB). None is included.") {
-                Button(onClick = { biosPicker.launch(arrayOf("*/*")) }) { Text(if (Emulator.iplLoaded) "Replace BIOS" else "Choose BIOS file") }
+                Button(onClick = { biosPicker.launch(arrayOf("*/*")) }) { gb.frame.KitText(if (Emulator.iplLoaded) "Replace BIOS" else "Choose BIOS file") }
                 if (Emulator.iplLoaded) WizardStatus("BIOS loaded")
             },
             WizardStep(Icons.Default.VideoLibrary, "Games folder", listOf(Color(0xFF66E3A4), Color(0xFF1FA2A8)),
                 "Pick the folder that holds your Saturn disc images (CUE/BIN, CHD, ISO, MDS, CCD). GBSat only reads that folder.") {
-                Button(onClick = { gamesPicker.launch(null) }) { Text("Choose folder") }
+                Button(onClick = { gamesPicker.launch(null) }) { gb.frame.KitText("Choose folder") }
                 if (Emulator.gamesDir.isNotBlank()) WizardStatus(Storage.folderLabel(Emulator.gamesDir))
             },
             gb.frame.performanceWizardStep(Emulator.recommendedPreset.label,

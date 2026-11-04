@@ -100,11 +100,11 @@ fun SettingsScreen(onBack: () -> Unit, toast: (String) -> Unit, page: SettingsPa
         }
     }
     if (biosCandidates.isNotEmpty()) AlertDialog(
-        onDismissRequest = { biosCandidates = emptyList() }, title = { Text("Choose Saturn BIOS") },
+        onDismissRequest = { biosCandidates = emptyList() }, title = { gb.frame.KitText("Choose Saturn BIOS") },
         text = { Column { biosCandidates.forEach { file -> TextButton(onClick = {
             biosCandidates = emptyList(); importBios(file.uri)
-        }) { Text(file.name ?: "BIOS") } } } },
-        confirmButton = { TextButton(onClick = { biosCandidates = emptyList() }) { Text("Cancel") } },
+        }) { gb.frame.KitText(file.name ?: "BIOS") } } } },
+        confirmButton = { TextButton(onClick = { biosCandidates = emptyList() }) { gb.frame.KitText("Cancel") } },
     )
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         uri?.let { Storage.takeFolder(it); Emulator.gamesDir = it.toString(); Emulator.savePrefs() }
@@ -121,7 +121,7 @@ fun SettingsScreen(onBack: () -> Unit, toast: (String) -> Unit, page: SettingsPa
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(current.icon, null, tint = palette.highlight)
                         Spacer(Modifier.width(12.dp))
-                        Text(current.label, fontWeight = FontWeight.Bold)
+                        gb.frame.KitText(current.label, fontWeight = FontWeight.Bold)
                     }
                 },
                 navigationIcon = { SettingsPageBackButton(current, onBack) },
@@ -276,7 +276,7 @@ private fun VideoPage() {
                 onChange = ch { Emulator.resScale = it },
             )
             val gpuErr = remember { runCatching { NativeBridge.nativeGetGpuError().orEmpty() }.getOrDefault("") }
-            if (gpuErr.isNotEmpty()) Text("Last GPU error: $gpuErr", color = MaterialTheme.colorScheme.error,
+            if (gpuErr.isNotEmpty()) gb.frame.KitText("Last GPU error: $gpuErr", color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
     }

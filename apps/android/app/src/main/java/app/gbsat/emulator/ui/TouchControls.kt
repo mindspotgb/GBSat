@@ -99,7 +99,7 @@ private fun PortraitPad(modifier: Modifier, a: PadActions) {
             val s = minOf(1.5f, maxWidth / 364.dp, maxHeight / 290.dp).coerceAtLeast(0.5f)
             Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart))
             Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd))
-            Text(
+            gb.frame.KitText(
                 "SATURN", color = LogoColor, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
             )
@@ -187,7 +187,7 @@ private fun Face(label: String, b: SaturnButton, modifier: Modifier, tint: Color
                 .background(Brush.verticalGradient(listOf(tint.lighten(.25f), tint.darken(if (pressed) .25f else .08f))), CircleShape)
                 .border(1.dp, Color.Black.copy(alpha = .25f), CircleShape),
             contentAlignment = Alignment.Center,
-        ) { Text(label, color = tint.darken(.45f), fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        ) { gb.frame.KitText(label, color = tint.darken(.45f), fontSize = 18.sp, fontWeight = FontWeight.Bold) }
     }
 
 @Composable
@@ -199,7 +199,7 @@ private fun Lobe(label: String, b: SaturnButton, left: Boolean, modifier: Modifi
             Modifier.fillMaxSize().background(if (pressed) Crimson.darken(.2f) else Crimson, shape),
             contentAlignment = if (left) Alignment.CenterStart else Alignment.CenterEnd,
         ) {
-            Text(label, color = Color.Black.copy(alpha = .35f), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 18.dp))
+            gb.frame.KitText(label, color = Color.Black.copy(alpha = .35f), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 18.dp))
         }
     }
 }
@@ -215,7 +215,7 @@ private fun Pill(label: String, tint: Color, onClick: () -> Unit) =
 private fun LabeledPill(label: String, tint: Color, key: String, onPressed: (Boolean) -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, color = LabelColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        gb.frame.KitText(label, color = LabelColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(3.dp))
         PressArea(key, onPressed, Modifier.size(width = 58.dp, height = 24.dp)) { pressed ->
             Box(
@@ -234,7 +234,7 @@ private fun StateAction(label: String, icon: androidx.compose.ui.graphics.vector
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(icon, null, tint = GreyButton, modifier = Modifier.size(24.dp))
-        Text(label, color = GreyButton, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        gb.frame.KitText(label, color = GreyButton, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
 
