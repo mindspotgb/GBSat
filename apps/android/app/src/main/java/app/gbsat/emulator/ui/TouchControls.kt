@@ -122,7 +122,9 @@ private fun LegacyPortraitPad(modifier: Modifier, a: PadActions) {
             StateAction("SAVE", Icons.Default.Download, a.onSave)
         }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-            SaturnControllerPanel(Modifier.fillMaxSize(), RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+            if (maxHeight / maxWidth > 1.5f) {
+                SaturnControllerPanel(Modifier.fillMaxSize(), RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+            }
             val s = minOf(1.15f, maxWidth / 392.dp, maxHeight / 290.dp).coerceAtLeast(.72f)
             Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart))
             Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd))
