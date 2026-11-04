@@ -133,7 +133,10 @@ fun SettingsScreen(onBack: () -> Unit, toast: (String) -> Unit, page: SettingsPa
             ) {
                 Column(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     when (current) {
-                        SettingsPage.System -> SystemPage({ biosPicker.launch(arrayOf("*/*")) }, { biosFolderPicker.launch(null) }, importingBios, { folderPicker.launch(null) },
+                    SettingsPage.System -> SystemPage({ biosPicker.launch(arrayOf("*/*")) }, { biosFolderPicker.launch(null) }, importingBios, {
+                        folderPicker.launch(Emulator.gamesDir.takeIf { it.isNotBlank() }?.let(Uri::parse)
+                            ?: gb.frame.StorageDefaults.treePickerUri(gb.frame.StorageDefaults.SATURN_GAMES_DIRECTORY))
+                    },
                             onCart = { cartFile = it; cartPicker.launch(arrayOf("*/*")) })
                         SettingsPage.Video -> VideoPage()
                         SettingsPage.Audio -> AudioPage()

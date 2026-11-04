@@ -452,7 +452,10 @@ object Emulator {
         Storage.init(appContext)
         Thread { gb.frame.DeviceTier.detect() }.start() // GPU name from a throwaway OpenGL ES context, off the main thread
         dataDir = File(appContext.filesDir.path)
-        dataFolder = gb.frame.AppDataFolder(appContext, "GBSat", (dataSubdirs + "carts").associateWith { File(dataDir, it) })
+        dataFolder = gb.frame.AppDataFolder(
+            appContext, "GBSat", (dataSubdirs + "carts").associateWith { File(dataDir, it) },
+            recommendedLocation = gb.frame.StorageDefaults.dataFolder("GBSat"),
+        )
         System.loadLibrary("gbsat")
         dataFolder.openAtStartup()
         stateFiles = gb.frame.SaveStateFiles(dataDir, prefs)

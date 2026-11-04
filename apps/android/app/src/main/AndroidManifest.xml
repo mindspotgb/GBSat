@@ -44,6 +44,12 @@
                 <data android:pathPattern=".*\\.MDS" />
                 <data android:pathPattern=".*\\.ccd" />
                 <data android:pathPattern=".*\\.CCD" />
+                <data android:pathPattern=".*\\.zip" />
+                <data android:pathPattern=".*\\.ZIP" />
+                <data android:pathPattern=".*\\.7z" />
+                <data android:pathPattern=".*\\.7Z" />
+                <data android:pathPattern=".*\\.rar" />
+                <data android:pathPattern=".*\\.RAR" />
             </intent-filter>
             <!-- Some frontends send file/content URIs without a MIME type. -->
             <intent-filter>
@@ -62,6 +68,12 @@
                 <data android:pathPattern=".*\\.MDS" />
                 <data android:pathPattern=".*\\.ccd" />
                 <data android:pathPattern=".*\\.CCD" />
+                <data android:pathPattern=".*\\.zip" />
+                <data android:pathPattern=".*\\.ZIP" />
+                <data android:pathPattern=".*\\.7z" />
+                <data android:pathPattern=".*\\.7Z" />
+                <data android:pathPattern=".*\\.rar" />
+                <data android:pathPattern=".*\\.RAR" />
             </intent-filter>
         </activity>
         <activity-alias

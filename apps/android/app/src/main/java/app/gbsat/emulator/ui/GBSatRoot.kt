@@ -50,7 +50,7 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
             scope.launch {
                 val game = withContext(Dispatchers.IO) {
                     val gamesDir = Emulator.gamesDir
-                    gb.frame.LaunchIntent.resolveOrRefresh(requested, Storage.cachedScan(gamesDir)) {
+                    Storage.resolveLaunchRequest(requested, Storage.cachedScan(gamesDir)) {
                         Storage.scan(gamesDir)
                     }
                 }

@@ -28,23 +28,37 @@ fun SetupWizard(onFinish: () -> Unit) {
     val gamesPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         uri?.let { Storage.takeFolder(it); Emulator.gamesDir = it.toString(); Emulator.savePrefs(); message = null }
     }
+    val dataPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+        uri?.let { selected -> scope.launch { Emulator.dataFolder.choose(selected) } }
+    }
+    val chooseDataFolder = {
+        val start = Emulator.dataFolder.folder?.let(Uri::parse)
+            ?: gb.frame.StorageDefaults.treePickerUri(gb.frame.StorageDefaults.EMULATORS_DIRECTORY)
+        dataPicker.launch(start)
+    }
+    val chooseGamesFolder = {
+        val start = Emulator.gamesDir.takeIf { it.isNotBlank() }?.let(Uri::parse)
+            ?: gb.frame.StorageDefaults.treePickerUri(gb.frame.StorageDefaults.SATURN_GAMES_DIRECTORY)
+        gamesPicker.launch(start)
+    }
     // First run starts with the default settings; the device's recommended preset is only applied by the wizard's button
     LaunchedEffect(Unit) { if (!Emulator.setupDone) Emulator.applyDefaultSettings() }
     gb.frame.SetupWizard(
         steps = listOf(
             WizardStep(Icons.Default.SportsEsports, "Welcome to GBSat", listOf(Color(0xFF8B7CFF), Color(0xFFE85CC4)),
                 "A Saturn emulator for Android. A few steps and you're ready to play."),
-            gb.frame.dataFolderWizardStep(Emulator.dataFolder),
+            gb.frame.dataFolderWizardStep(Emulator.dataFolder, chooseDataFolder),
             WizardStep(Icons.Default.Memory, "Saturn BIOS", listOf(Color(0xFFFFB347), Color(0xFFFF6B6B)),
                 "GBSat needs your own Saturn BIOS (IPL ROM, 512 KiB). None is included.") {
                 Button(onClick = { biosPicker.launch(arrayOf("*/*")) }) { gb.frame.KitText(if (Emulator.iplLoaded) "Replace BIOS" else "Choose BIOS file") }
                 if (Emulator.iplLoaded) WizardStatus("BIOS loaded")
             },
-            WizardStep(Icons.Default.VideoLibrary, "Games folder", listOf(Color(0xFF66E3A4), Color(0xFF1FA2A8)),
-                "Pick the folder that holds your Saturn disc images (CUE/BIN, CHD, ISO, MDS, CCD). GBSat only reads that folder.") {
-                Button(onClick = { gamesPicker.launch(null) }) { gb.frame.KitText("Choose folder") }
-                if (Emulator.gamesDir.isNotBlank()) WizardStatus(Storage.folderLabel(Emulator.gamesDir))
-            },
+            gb.frame.gamesFolderWizardStep(
+                gb.frame.StorageDefaults.SATURN_GAMES_DIRECTORY,
+                "Pick the folder that holds your Saturn disc images (CUE/BIN, CHD, ISO, MDS, CCD). GBSat only reads that folder.",
+                { Emulator.gamesDir.takeIf { it.isNotBlank() }?.let(Storage::folderLabel) },
+                chooseGamesFolder,
+            ),
             gb.frame.performanceWizardStep(Emulator.recommendedPreset.label,
                 Emulator.presetWizardOptions(Emulator.recommendedPreset),
                 onApply = { Emulator.applyPreset(Emulator.recommendedPreset) }),
