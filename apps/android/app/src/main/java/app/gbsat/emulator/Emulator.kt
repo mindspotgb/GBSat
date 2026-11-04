@@ -469,9 +469,12 @@ object Emulator {
         cpuSync = prefs.getInt("sh2Sync", 1).coerceIn(0, 1)
         sh2Recompiler = prefs.getBoolean("cpuRecompiler", true)
         scspMode = prefs.getInt("scspMode", 0).coerceIn(0, 2)
-        touchControlsMode = runCatching {
-            TouchControlsMode.valueOf(prefs.getString("touchControlsMode", TouchControlsMode.AUTO.name) ?: TouchControlsMode.AUTO.name)
-        }.getOrDefault(TouchControlsMode.AUTO)
+        val storedTouchMode = prefs.getString("touchControlsMode", TouchControlsMode.AUTO.name) ?: TouchControlsMode.AUTO.name
+        touchControlsMode = when (storedTouchMode) {
+            "SHOW" -> TouchControlsMode.ON
+            else -> runCatching { TouchControlsMode.valueOf(storedTouchMode) }.getOrDefault(TouchControlsMode.AUTO)
+        }
+        if (storedTouchMode == "SHOW") prefs.edit().putString("touchControlsMode", TouchControlsMode.ON.name).apply()
         touchHapticsEnabled = prefs.getBoolean("touchHapticsEnabled", true)
         aspect = prefs.getInt("aspect", 0).coerceIn(0, 2)
         widescreenGameHacks = prefs.getBoolean("widescreenGameHacks", gb.frame.GameHackPolicy.WIDESCREEN_DEFAULT_ENABLED)

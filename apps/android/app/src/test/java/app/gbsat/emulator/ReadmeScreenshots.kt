@@ -103,8 +103,8 @@ abstract class ScreenTest {
 
 /** README screenshots (docs/screenshots). */
 class ReadmeScreenshots : ScreenTest() {
-    @Test fun library() = shot("library", { LibraryScreen({}, {}, {}, {}) })
-    @Test fun menu() = shot("menu", { LibraryScreen({}, {}, {}, {}) }) { rule.onNodeWithText("GBSat").performClick() }
+    @Test fun library() = shot("library", { LibraryScreen({}, { _, _ -> null }, { _, _ -> null }, {}, {}) })
+    @Test fun menu() = shot("menu", { LibraryScreen({}, { _, _ -> null }, { _, _ -> null }, {}, {}) }) { rule.onNodeWithText("GBSat").performClick() }
     @Test fun wizard() = shot("setup", { SetupWizard({}) }) {
         // Through to the last step (the preset picker)
         while (rule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()) {
@@ -124,22 +124,22 @@ class ReadmeScreenshots : ScreenTest() {
 class DeviceScreens : ScreenTest() {
     override val out = "build/device-screens"
 
-    private fun library(d: String) = shot("$d-library", { LibraryScreen({}, {}, {}, {}) })
-    private fun menu(d: String) = shot("$d-menu", { LibraryScreen({}, {}, {}, {}) }) { rule.onNodeWithText("GBSat").performClick() }
+    private fun library(d: String) = shot("$d-library", { LibraryScreen({}, { _, _ -> null }, { _, _ -> null }, {}, {}) })
+    private fun menu(d: String) = shot("$d-menu", { LibraryScreen({}, { _, _ -> null }, { _, _ -> null }, {}, {}) }) { rule.onNodeWithText("GBSat").performClick() }
     private fun recentShot(d: String, style: gb.frame.HomeStyle) {
         gb.frame.HomeTheme.style.value = style
         sampleStates()
-        shot("$d-recent-${style.name.lowercase()}", { LibraryScreen({}, {}, {}, {}) })
+        shot("$d-recent-${style.name.lowercase()}", { LibraryScreen({}, { _, _ -> null }, { _, _ -> null }, {}, {}) })
     }
     @Test @Config(qualifiers = "w427dp-h320dp-land-hdpi") fun r640Showcase() = recentShot("640x480-hdpi", gb.frame.HomeStyle.Showcase)
     @Test @Config(qualifiers = "w360dp-h360dp-land-xhdpi") fun r720Showcase() = recentShot("720x720-xhdpi", gb.frame.HomeStyle.Showcase)
     @Test @Config(qualifiers = "w853dp-h480dp-land-xhdpi") fun allInOneStates() {
         sampleStates(); gb.frame.HomeTheme.style.value = gb.frame.HomeStyle.Continue
-        shot("16x9-theme-continue-states", { LibraryScreen({}, {}, {}, {}) })
+        shot("16x9-theme-continue-states", { LibraryScreen({}, { _, _ -> null }, { _, _ -> null }, {}, {}) })
     }
     private fun theme(d: String, style: gb.frame.HomeStyle) {
         gb.frame.HomeTheme.style.value = style
-        shot("$d-theme-${style.name.lowercase()}", { LibraryScreen({}, {}, {}, {}) })
+        shot("$d-theme-${style.name.lowercase()}", { LibraryScreen({}, { _, _ -> null }, { _, _ -> null }, {}, {}) })
     }
     private fun video(d: String) = shot("$d-video", { SettingsScreen({}, {}, SettingsPage.Video) })
     private fun setup(d: String) = shot("$d-setup", { SetupWizard({}) }) {

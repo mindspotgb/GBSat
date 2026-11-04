@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -34,6 +35,8 @@ import app.gbsat.emulator.Emulator
 import app.gbsat.emulator.NativeBridge
 import app.gbsat.emulator.SaturnButton
 import gb.frame.TouchDPad
+import gb.frame.TouchControlsLayoutMetrics
+import gb.frame.TouchControlsOverlay
 import gb.frame.TouchDirection
 import kotlinx.coroutines.launch
 import kotlin.math.hypot
@@ -50,8 +53,7 @@ private object TouchState {
 }
 
 // Saturn pad skin: light grey body, crimson shoulder lobes, dark D-pad, grey X/Y/Z, green A, yellow B, blue C.
-private val BodyColor = Color(0xFF1E1E20)
-private val RingColor = Color(0xFF2C2C2F)
+private val RingColor = Color(0xB32C2C2F)
 private val Crimson = Color(0xFFA3173F)
 private val LogoColor = Color(0xFF8A8A8A)
 private val LabelColor = Color(0xFFD0D0D0)
@@ -62,8 +64,8 @@ private class PadActions(
 )
 
 /**
- * The on-screen Saturn pad. Portrait: LOAD/SAVE above a pad body below the picture. Landscape: left and right panels
- * beside the picture (L/R lobes, D-pad, buttons, FAST/START and FILTERS/MENU). LOAD/SAVE use the quick-save slot.
+ * Saturn-specific button art inside GBFrame's transparent, full-window responsive overlay. Portrait controls anchor to
+ * the bottom; landscape controls anchor to the lower screen edges. LOAD/SAVE use the quick-save slot.
  */
 @Composable
 fun TouchControls(modifier: Modifier, landscape: Boolean, onMenu: () -> Unit = {}, videoRatio: Float = 4f / 3f) {
@@ -80,78 +82,99 @@ fun TouchControls(modifier: Modifier, landscape: Boolean, onMenu: () -> Unit = {
         },
         onMenu = onMenu,
     )
-    if (landscape) LandscapePad(modifier, videoRatio, actions) else PortraitPad(modifier, actions)
+    TouchControlsOverlay(
+        modifier = modifier,
+        referenceWidth = if (landscape) 720.dp else 480.dp,
+        referenceHeight = if (landscape) 720.dp else 960.dp,
+    ) { layout ->
+        if (landscape) LandscapePad(Modifier.fillMaxSize(), videoRatio, actions, layout)
+        else PortraitPad(Modifier.fillMaxSize(), actions, layout)
+    }
 }
 
 @Composable
-private fun PortraitPad(modifier: Modifier, a: PadActions) {
-    Column(modifier) {
-        Row(
-            Modifier.fillMaxWidth().height(52.dp).background(Color.Black),
-            horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically,
+private fun PortraitPad(modifier: Modifier, a: PadActions, layout: TouchControlsLayoutMetrics) {
+    val s = layout.scale
+    val compactSquare = layout.nearSquare
+    // On square screens the free area below a 4:3 game is shallow, so keep every action in one compact bottom row.
+    val groupHeight = if (layout.compact) 260.dp else 290.dp
+    Box(modifier) {
+        Box(
+            Modifier.align(Alignment.BottomCenter).padding(bottom = layout.edgePadding).size(364.dp, groupHeight)
+                .graphicsLayer {
+                    scaleX = s
+                    scaleY = s
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                },
         ) {
-            StateAction("LOAD", Icons.Default.Refresh, a.onLoad)
-            StateAction("SAVE", Icons.Default.Download, a.onSave)
-        }
-        BoxWithConstraints(
-            Modifier.fillMaxWidth().weight(1f).background(BodyColor, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
-        ) {
-            val s = minOf(1.5f, maxWidth / 364.dp, maxHeight / 290.dp).coerceAtLeast(0.5f)
             Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart))
             Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd))
-            Text(
-                "SATURN", color = LogoColor, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
-            )
-            Box(Modifier.align(Alignment.Center).size(364.dp, 290.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                Box(Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 34.dp)) { DPadRing() }
-                Box(Modifier.align(Alignment.TopEnd).offset(x = (-8).dp, y = 34.dp)) { FaceRing() }
-                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Pill("FAST", GreyButton, a.onFast)
-                    Pill("MENU", GreyButton, a.onMenu)
-                    StartPill()
-                }
+            if (!compactSquare) {
+                Text(
+                    "SATURN", color = LogoColor, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
+                )
+            }
+            Box(Modifier.align(Alignment.TopStart).offset(x = 8.dp, y = 34.dp)) { DPadRing() }
+            Box(Modifier.align(Alignment.TopEnd).offset(x = (-8).dp, y = 34.dp)) { FaceRing() }
+            Row(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (compactSquare) 6.dp else 14.dp),
+            ) {
+                Pill("FAST", GreyButton, a.onFast)
+                Pill("MENU", GreyButton, a.onMenu)
+                StartPill()
+            }
+        }
+        if (!compactSquare) {
+            Row(
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = layout.edgePadding + groupHeight * s + 2.dp)
+                    .graphicsLayer { scaleX = s; scaleY = s; transformOrigin = TransformOrigin(0.5f, 1f) },
+                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StateAction("LOAD", Icons.Default.Refresh, a.onLoad)
+                StateAction("SAVE", Icons.Default.Download, a.onSave)
             }
         }
     }
 }
 
 @Composable
-private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
-    // Full screen: the panels ignore the camera cutout and reach the screen edges
-    val insetL = 0.dp
-    val insetR = 0.dp
-    BoxWithConstraints(modifier) {
-        val full = Emulator.aspect == 1
-        // The picture is centered on the whole screen, so each side panel is half of what it leaves free
-        val side = if (full) 0.dp else ((maxWidth - maxHeight * ratio) / 2).coerceAtLeast(0.dp)
-        val overlay = full || side < 120.dp // no room for panels beside the picture: draw the controls over it
-        val panelW = if (overlay) 200.dp + insetL.coerceAtLeast(insetR) else side
-        val s = minOf(1f, (panelW - maxOf(insetL, insetR)) / 200.dp, maxHeight / 340.dp).coerceAtLeast(0.5f)
-        val panelBg = if (overlay) Modifier else Modifier.background(BodyColor)
-        Box(Modifier.align(Alignment.CenterStart).width(panelW).fillMaxHeight().then(panelBg)) {
-            Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart).padding(top = 68.dp))
-            Box(Modifier.fillMaxSize().padding(start = insetL)) {
-                Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                    Box(Modifier.align(Alignment.BottomCenter).offset(y = 14.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
-                    Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { DPadRing() }
-                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Pill("FAST", GreyButton, a.onFast)
-                        StartPill()
-                    }
+private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions, layout: TouchControlsLayoutMetrics) {
+    // Keep the common GBFrame layer transparent; both clusters anchor to the lower screen edges.
+    val full = Emulator.aspect == 1
+    val side = if (full) 0.dp else ((layout.screenWidth - layout.screenHeight * ratio) / 2).coerceAtLeast(0.dp)
+    val overlay = full || side < 120.dp
+    val panelW = if (overlay) 200.dp else side
+    val s = minOf(layout.scale, panelW / 200.dp).coerceAtLeast(0.35f)
+    Box(modifier) {
+        Box(Modifier.align(Alignment.BottomStart).width(panelW).fillMaxHeight()) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = layout.edgePadding).size(200.dp, 340.dp)
+                    .graphicsLayer { scaleX = s; scaleY = s; transformOrigin = TransformOrigin(0.5f, 1f) },
+            ) {
+                Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart).padding(top = 68.dp))
+                Box(Modifier.align(Alignment.BottomCenter)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
+                Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { DPadRing() }
+                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Pill("FAST", GreyButton, a.onFast)
+                    StartPill()
                 }
             }
         }
-        Box(Modifier.align(Alignment.CenterEnd).width(panelW).fillMaxHeight().then(panelBg)) {
-            Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd).padding(top = 68.dp))
-            Box(Modifier.fillMaxSize().padding(end = insetR)) {
-                Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                    Box(Modifier.align(Alignment.BottomCenter).offset(y = 14.dp)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
-                    Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { FaceRing() }
-                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Pill("FILTERS", GreyButton, a.onFilters)
-                        Pill("MENU", GreyButton, a.onMenu)
-                    }
+        Box(Modifier.align(Alignment.BottomEnd).width(panelW).fillMaxHeight()) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = layout.edgePadding).size(200.dp, 340.dp)
+                    .graphicsLayer { scaleX = s; scaleY = s; transformOrigin = TransformOrigin(0.5f, 1f) },
+            ) {
+                Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd).padding(top = 68.dp))
+                Box(Modifier.align(Alignment.BottomCenter)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
+                Box(Modifier.align(Alignment.Center).offset(y = (-16).dp)) { FaceRing() }
+                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Pill("FILTERS", GreyButton, a.onFilters)
+                    Pill("MENU", GreyButton, a.onMenu)
                 }
             }
         }

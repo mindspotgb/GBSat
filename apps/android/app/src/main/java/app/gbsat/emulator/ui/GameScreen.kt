@@ -100,9 +100,9 @@ fun GameScreen(onQuitApp: () -> Unit) {
         if (GbSatPausePolicy.shouldResumeOnEntry(Emulator.paused, menu)) Emulator.pause(false)
     }
 
-    // Auto hides touch controls while a physical controller is connected; Show is an explicit override.
+    // Auto hides touch controls while a physical controller is connected; On and Off override detection.
     val hasPad = gb.frame.rememberHasGamepad()
-    val touch = Emulator.touchControlsMode == gb.frame.TouchControlsMode.SHOW ||
+    val touch = Emulator.touchControlsMode == gb.frame.TouchControlsMode.ON ||
         (Emulator.touchControlsMode == gb.frame.TouchControlsMode.AUTO && !hasPad)
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val landscape = maxWidth > maxHeight
@@ -116,13 +116,11 @@ fun GameScreen(onQuitApp: () -> Unit) {
             }
             if (touch) TouchControls(Modifier.fillMaxSize(), landscape = true, onMenu = { menu = true; Emulator.pause(true) }, videoRatio = ratio)
         } else {
-            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                // Fullscreen fills the whole area above the touch controls (or the whole screen when they are hidden)
+            Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
+                // Keep the game at its normal size; the transparent touch layer overlays it instead of reserving height.
                 val full = Emulator.aspect == 1
-                Box(Modifier.fillMaxWidth().weight(1f, fill = full), contentAlignment = Alignment.TopCenter) {
-                    VideoSurface(if (full) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(ratio))
-                }
-                if (touch) TouchControls(Modifier.fillMaxWidth().weight(1f), landscape = false, onMenu = { menu = true; Emulator.pause(true) })
+                VideoSurface(if (full) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(ratio))
+                if (touch) TouchControls(Modifier.fillMaxSize(), landscape = false, onMenu = { menu = true; Emulator.pause(true) })
             }
         }
 
