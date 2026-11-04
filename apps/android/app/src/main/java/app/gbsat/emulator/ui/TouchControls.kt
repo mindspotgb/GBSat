@@ -105,13 +105,95 @@ fun TouchControls(
             referenceHeight = if (landscape) 720.dp else 960.dp,
             videoAspectRatio = videoRatio,
         ) { layout ->
-            if (landscape) LandscapePad(Modifier.fillMaxSize(), videoRatio, actions, layout)
-            else PortraitPad(Modifier.fillMaxSize(), actions, layout)
+            if (landscape && layout.plan.placement == TouchControlsPlacement.LANDSCAPE_SIDES) ArtworkLandscapePad(Modifier.fillMaxSize(), videoRatio, actions)
+            else if (landscape) LandscapePad(Modifier.fillMaxSize(), videoRatio, actions, layout)
+            else if (layout.plan.placement == TouchControlsPlacement.PORTRAIT_BOTTOM) {
+                val top = layout.plan.video.top + layout.plan.video.height
+                ArtworkPortraitPad(Modifier.offset(y = top.dp).fillMaxWidth().height((layout.screenHeight.value - top).coerceAtLeast(0f).dp), actions)
+            } else PortraitPad(Modifier.fillMaxSize(), actions, layout)
         }
     } else if (landscape) {
-        LegacyLandscapePad(modifier, videoRatio, actions)
+        ArtworkLandscapePad(modifier, videoRatio, actions)
     } else {
-        LegacyPortraitPad(modifier, actions)
+        ArtworkPortraitPad(modifier, actions)
+    }
+}
+
+/** Artwork uses normalized hit regions so the same input positions follow the scaled image. */
+@Composable
+private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth().height(42.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            StateAction("LOAD", Icons.Default.Refresh, a.onLoad)
+            StateAction("SAVE", Icons.Default.Download, a.onSave)
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
+            val w = minOf(maxWidth, maxHeight * (480f / 615f))
+            ArtworkPanel(Modifier.width(w).height(w * (615f / 480f)), R.drawable.saturn_panel_portrait, 0, a)
+        }
+    }
+}
+
+@Composable
+private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
+    BoxWithConstraints(modifier) {
+        val side = ((maxWidth - maxHeight * ratio) / 2).coerceAtLeast(0.dp)
+        if (Emulator.aspect == 1 || side < 100.dp) {
+            LegacyLandscapePad(Modifier.fillMaxSize(), ratio, a)
+        } else {
+            val h = minOf(maxHeight, side * (400f / 232f))
+            ArtworkPanel(Modifier.align(Alignment.CenterStart).width(side).height(h), R.drawable.saturn_panel_left, 1, a)
+            ArtworkPanel(Modifier.align(Alignment.CenterEnd).width(side).height(h), R.drawable.saturn_panel_right, 2, a)
+        }
+    }
+}
+
+@Composable
+private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions) {
+    BoxWithConstraints(modifier) {
+        val w = maxWidth
+        val h = maxHeight
+        Image(painterResource(art), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
+        @Composable fun button(x: Float, y: Float, bw: Float, bh: Float, key: String, onPressed: (Boolean) -> Unit) {
+            PressArea(key, onPressed, Modifier.offset(x = w * (x - bw / 2), y = h * (y - bh / 2)).size(w * bw, h * bh)) { down ->
+                if (down) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = .22f), CircleShape))
+            }
+        }
+        @Composable fun saturn(x: Float, y: Float, bw: Float, bh: Float, b: SaturnButton) {
+            button(x, y, bw, bh, "art-$panel-$b") { down -> TouchState.set(b, if (down) b.bit else 0) }
+        }
+        @Composable fun action(x: Float, y: Float, bw: Float, bh: Float, key: String, run: () -> Unit) {
+            button(x, y, bw, bh, "art-$panel-$key") { down -> if (down) run() }
+        }
+        @Composable fun directions(x: Float, y: Float, size: Float) {
+            TouchDPad(onDirectionsChanged = { dirs ->
+                TouchState.set("dpad", dirs.fold(0) { bits, direction -> bits or when (direction) {
+                    TouchDirection.UP -> SaturnButton.Up.bit
+                    TouchDirection.DOWN -> SaturnButton.Down.bit
+                    TouchDirection.LEFT -> SaturnButton.Left.bit
+                    TouchDirection.RIGHT -> SaturnButton.Right.bit
+                } })
+            }, hapticsEnabled = Emulator.touchHapticsEnabled,
+                modifier = Modifier.offset(x = w * (x - size / 2), y = h * (y - size * (w.value / h.value) / 2)).size(w * size),
+                track = Color.Transparent, normal = Color.Transparent, selected = Color.White.copy(alpha = .22f),
+                center = Color.Transparent, arrow = Color.Transparent, border = Color.Transparent)
+        }
+        if (panel == 0) {
+            saturn(.17f,.10f,.24f,.12f,SaturnButton.L); saturn(.83f,.10f,.24f,.12f,SaturnButton.R)
+            directions(.26f,.47f,.36f)
+            saturn(.58f,.43f,.12f,.10f,SaturnButton.X); saturn(.70f,.38f,.12f,.10f,SaturnButton.Y); saturn(.83f,.35f,.12f,.10f,SaturnButton.Z)
+            saturn(.60f,.55f,.13f,.10f,SaturnButton.A); saturn(.74f,.49f,.13f,.10f,SaturnButton.B); saturn(.88f,.46f,.13f,.10f,SaturnButton.C)
+            action(.28f,.84f,.16f,.09f,"fast",a.onFast); action(.50f,.84f,.16f,.09f,"menu",a.onMenu); saturn(.72f,.84f,.16f,.09f,SaturnButton.Start)
+        } else if (panel == 1) {
+            saturn(.36f,.13f,.55f,.16f,SaturnButton.L); action(.80f,.16f,.18f,.11f,"load",a.onLoad)
+            directions(.55f,.63f,.65f)
+            action(.46f,.93f,.30f,.10f,"fast",a.onFast); saturn(.80f,.93f,.30f,.10f,SaturnButton.Start)
+        } else {
+            saturn(.64f,.13f,.58f,.16f,SaturnButton.R); action(.21f,.16f,.18f,.11f,"save",a.onSave)
+            saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
+            saturn(.22f,.74f,.23f,.12f,SaturnButton.A); saturn(.46f,.67f,.23f,.12f,SaturnButton.B); saturn(.72f,.63f,.23f,.12f,SaturnButton.C)
+            action(.21f,.93f,.28f,.10f,"filters",a.onFilters); action(.54f,.93f,.28f,.10f,"menu",a.onMenu)
+        }
     }
 }
 
