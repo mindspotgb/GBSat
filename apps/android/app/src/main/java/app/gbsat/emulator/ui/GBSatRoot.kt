@@ -60,7 +60,7 @@ fun GBSatRoot(onImmersive: (Boolean) -> Unit, onQuitApp: () -> Unit) {
             }
         }
 
-        LaunchedEffect(inGame) { onImmersive(true) } // the whole app runs full screen
+        LaunchedEffect(inGame) { onImmersive(true) } // bars hide in games and with a physical controller
 
         Emulator.lastCrash?.let { report ->
             val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
