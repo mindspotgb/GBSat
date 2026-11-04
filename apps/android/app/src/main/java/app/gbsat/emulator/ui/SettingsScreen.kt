@@ -156,6 +156,7 @@ fun SettingsScreen(onBack: () -> Unit, toast: (String) -> Unit, page: SettingsPa
                             ),
                             license = "GBSat source code is distributed under GNU GPL v3. GBFrame is used under GPLv3 here; third-party components keep their own licenses. Google Play Billing and Play Services are supplied under Google's separate SDK terms. See the notices below. Sega Saturn is a trademark of Sega; GBSat is not affiliated with Sega.",
                             privacyPolicyUrl = "https://raw.githubusercontent.com/mindspotgb/GBSat/main/PRIVACY.md",
+                            updateConfig = UPDATE_CONFIG,
                             tagline = "Brought to you by GameBeacon.dev: 32-bit magic revived with precision and high performance.",
                             licenseDocuments = listOf(
                                 AboutLicenseDocument("GNU GPL v3 — GBSat, GBFrame and Ymir", "licenses/GNU-GPL-3.0.txt"),
@@ -319,8 +320,6 @@ val UPDATE_CONFIG = gb.frame.AppUpdateConfig(githubRepo = "mindspotgb/GBSat")
 @Composable
 private fun ExtrasPage() {
     gb.frame.AppLanguageSettings()
-    SettingsGroup("Updates", null) { gb.frame.UpdateCheckRow(gb.frame.rememberUpdateController(UPDATE_CONFIG)) }
-    Spacer(Modifier.height(12.dp))
     Spacer(Modifier.height(12.dp))
     RetroAchievementsSettings("GBSat")
 }
