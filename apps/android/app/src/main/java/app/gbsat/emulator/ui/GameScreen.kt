@@ -114,7 +114,7 @@ fun GameScreen(onQuitApp: () -> Unit) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 VideoSurface(videoMod.fillMaxHeight())
             }
-            if (touch) TouchControls(Modifier.fillMaxSize().safeDrawingPadding(), landscape = true, onMenu = { menu = true; Emulator.pause(true) }, videoRatio = ratio)
+            if (touch) TouchControls(Modifier.fillMaxSize(), landscape = true, onMenu = { menu = true; Emulator.pause(true) }, videoRatio = ratio)
         } else {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 // Fullscreen fills the whole area above the touch controls (or the whole screen when they are hidden)

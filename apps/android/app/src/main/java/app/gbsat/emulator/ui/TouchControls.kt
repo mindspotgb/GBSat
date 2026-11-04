@@ -50,11 +50,11 @@ private object TouchState {
 }
 
 // Saturn pad skin: light grey body, crimson shoulder lobes, dark D-pad, grey X/Y/Z, green A, yellow B, blue C.
-private val BodyColor = Color(0xFFE6E6E6)
-private val RingColor = Color(0xFFF3F3F3)
+private val BodyColor = Color(0xFF1E1E20)
+private val RingColor = Color(0xFF2C2C2F)
 private val Crimson = Color(0xFFA3173F)
-private val LogoColor = Color(0xFF9A9A9A)
-private val LabelColor = Color(0xFF3A3A3A)
+private val LogoColor = Color(0xFF8A8A8A)
+private val LabelColor = Color(0xFFD0D0D0)
 private val GreyButton = Color(0xFF8E8E8E)
 
 private class PadActions(
@@ -118,32 +118,42 @@ private fun PortraitPad(modifier: Modifier, a: PadActions) {
 
 @Composable
 private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val insets = WindowInsets.safeDrawing
+    // Camera cutout / rounded corners on the outer sides: panels reach the screen edge, their content stays clear of it
+    val insetL = with(density) { insets.getLeft(density, androidx.compose.ui.unit.LayoutDirection.Ltr).toDp() }
+    val insetR = with(density) { insets.getRight(density, androidx.compose.ui.unit.LayoutDirection.Ltr).toDp() }
     BoxWithConstraints(modifier) {
         val full = Emulator.aspect == 1
+        // The picture is centered on the whole screen, so each side panel is half of what it leaves free
         val side = if (full) 0.dp else ((maxWidth - maxHeight * ratio) / 2).coerceAtLeast(0.dp)
         val overlay = full || side < 120.dp // no room for panels beside the picture: draw the controls over it
-        val panelW = if (overlay) 200.dp else side
-        val s = minOf(1f, panelW / 200.dp, maxHeight / 300.dp).coerceAtLeast(0.5f)
+        val panelW = if (overlay) 200.dp + insetL.coerceAtLeast(insetR) else side
+        val s = minOf(1f, (panelW - maxOf(insetL, insetR)) / 200.dp, maxHeight / 340.dp).coerceAtLeast(0.5f)
         val panelBg = if (overlay) Modifier else Modifier.background(BodyColor)
         Box(Modifier.align(Alignment.CenterStart).width(panelW).fillMaxHeight().then(panelBg)) {
-            Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart))
-            Box(Modifier.align(Alignment.Center).size(200.dp, 300.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                Box(Modifier.align(Alignment.TopCenter).padding(top = 6.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
-                Box(Modifier.align(Alignment.Center).offset(y = 18.dp)) { DPadRing() }
-                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Pill("FAST", GreyButton, a.onFast)
-                    StartPill()
+            Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart).padding(top = 24.dp))
+            Box(Modifier.fillMaxSize().padding(start = insetL)) {
+                Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
+                    Box(Modifier.align(Alignment.TopCenter).padding(top = 70.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
+                    Box(Modifier.align(Alignment.Center).offset(y = 28.dp)) { DPadRing() }
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Pill("FAST", GreyButton, a.onFast)
+                        StartPill()
+                    }
                 }
             }
         }
         Box(Modifier.align(Alignment.CenterEnd).width(panelW).fillMaxHeight().then(panelBg)) {
-            Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd))
-            Box(Modifier.align(Alignment.Center).size(200.dp, 300.dp).graphicsLayer { scaleX = s; scaleY = s }) {
-                Box(Modifier.align(Alignment.TopCenter).padding(top = 6.dp)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
-                Box(Modifier.align(Alignment.Center).offset(y = 18.dp)) { FaceRing() }
-                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Pill("FILTERS", GreyButton, a.onFilters)
-                    Pill("MENU", GreyButton, a.onMenu)
+            Lobe("R", SaturnButton.R, left = false, Modifier.align(Alignment.TopEnd).padding(top = 24.dp))
+            Box(Modifier.fillMaxSize().padding(end = insetR)) {
+                Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
+                    Box(Modifier.align(Alignment.TopCenter).padding(top = 70.dp)) { StateAction("SAVE", Icons.Default.Download, a.onSave) }
+                    Box(Modifier.align(Alignment.Center).offset(y = 28.dp)) { FaceRing() }
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Pill("FILTERS", GreyButton, a.onFilters)
+                        Pill("MENU", GreyButton, a.onMenu)
+                    }
                 }
             }
         }
@@ -273,8 +283,8 @@ private fun DPad() = TouchDPad(
     },
     hapticsEnabled = Emulator.touchHapticsEnabled,
     modifier = Modifier.size(150.dp),
-    track = Color(0xFF3A3A3A), normal = Color(0xFF4A4A4A), selected = Color(0xFF777777),
-    center = Color(0xFF2E2E2E), arrow = Color(0xFF8A8A8A), border = Color.Black.copy(alpha = .3f),
+    track = Color(0xFF111112), normal = Color(0xFF1B1B1D), selected = Color(0xFF4A4A4E),
+    center = Color(0xFF0A0A0B), arrow = Color(0xFF8A8A8E), border = Color.White.copy(alpha = .08f),
 )
 
 @Composable
@@ -282,7 +292,7 @@ private fun AnalogStick() {
     var size by remember { mutableStateOf(IntSize.Zero) }
     var knob by remember { mutableStateOf(Offset.Zero) }
     Box(
-        Modifier.size(170.dp).onSizeChanged { size = it }.background(Color(0xFF3A3A3A), CircleShape)
+        Modifier.size(170.dp).onSizeChanged { size = it }.background(Color(0xFF111112), CircleShape)
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown()
@@ -301,6 +311,6 @@ private fun AnalogStick() {
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(knob.x.toInt(), knob.y.toInt()) }.size(64.dp).background(Color(0xFF8A8A8A), CircleShape))
+        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(knob.x.toInt(), knob.y.toInt()) }.size(64.dp).background(Color(0xFF55555A), CircleShape))
     }
 }
