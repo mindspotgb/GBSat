@@ -41,6 +41,7 @@
 #include <concepts>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iterator>
@@ -1400,8 +1401,20 @@ struct VulkanVDPRenderer::Impl {
     void CreatePipelineCache() {
         std::vector<char> data;
         if (!pipelineCacheFile.empty()) {
-            std::ifstream in(pipelineCacheFile, std::ios::binary);
-            data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+            // A marker lives from seeding until the renderer reached "ready". If it is still there, the previous run
+            // died while using the saved cache (some drivers crash on their own cache): drop the file and start clean.
+            const std::string marker = pipelineCacheFile + ".loading";
+            std::error_code ec;
+            if (std::filesystem::exists(marker, ec)) {
+                std::filesystem::remove(pipelineCacheFile, ec);
+                std::filesystem::remove(marker, ec);
+            } else {
+                std::ifstream in(pipelineCacheFile, std::ios::binary);
+                data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+                if (!data.empty()) {
+                    std::ofstream(marker, std::ios::binary) << '1';
+                }
+            }
         }
         pipelineCacheSeeded = data.size();
         VkPipelineCacheCreateInfo pcci{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
@@ -1743,6 +1756,10 @@ struct VulkanVDPRenderer::Impl {
         SubmitAndWait();
         SavePipelineCache();
         Step("vk: ready");
+        if (!pipelineCacheFile.empty()) {
+            std::error_code ec;
+            std::filesystem::remove(pipelineCacheFile + ".loading", ec);
+        }
 
         return {};
     }
