@@ -223,9 +223,10 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                     label = "$key-latched",
                 )
                 if (name != "fps" && name != "fast") {
-                    MechanicalArtworkPress(artwork, x, y, bw, bh, name, amount)
+                    if (panel != 0) LandscapeArtworkPress(artwork, x, y, bw, bh, name, amount)
+                    else MechanicalArtworkPress(artwork, x, y, bw, bh, name, amount)
                 } else {
-                    ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress, true)
+                    ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress, true, panel != 0)
                 }
             }
         }
@@ -298,6 +299,38 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
     }
 }
 
+/** Match the 88% pressed scale and 80% pressed opacity used by the full-screen landscape controls. */
+@Composable
+private fun LandscapeArtworkPress(
+    artwork: ImageBitmap,
+    x: Float,
+    y: Float,
+    width: Float,
+    height: Float,
+    name: String,
+    amount: Float,
+) {
+    if (amount <= .001f) return
+    val left = ((x - width / 2f) * artwork.width).toInt().coerceIn(0, artwork.width - 1)
+    val top = ((y - height / 2f) * artwork.height).toInt().coerceIn(0, artwork.height - 1)
+    val sourceWidth = (width * artwork.width).toInt().coerceIn(1, artwork.width - left)
+    val sourceHeight = (height * artwork.height).toInt().coerceIn(1, artwork.height - top)
+    val shape = if (name in setOf("A", "B", "C", "X", "Y", "Z", "save", "load")) CircleShape else RoundedCornerShape(40)
+    Canvas(Modifier.fillMaxSize().graphicsLayer {
+        val pressScale = 1f - .12f * amount
+        scaleX = pressScale
+        scaleY = pressScale
+        alpha = 1f - .20f * amount
+    }.clip(shape)) {
+        drawImage(
+            image = artwork,
+            srcOffset = androidx.compose.ui.unit.IntOffset(left, top),
+            srcSize = IntSize(sourceWidth, sourceHeight),
+            dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)),
+        )
+    }
+}
+
 /** Adds a subtle, console-like depression over the printed buttons without covering the supplied Saturn artwork. */
 @Composable
 private fun ControllerArtworkPressEffect(
@@ -306,8 +339,16 @@ private fun ControllerArtworkPressEffect(
     pressed: Float,
     latched: Float,
     mechanical: Boolean = false,
+    matchLandscapePress: Boolean = false,
 ) {
-    Canvas(modifier) {
+    Canvas(modifier.graphicsLayer {
+        if (matchLandscapePress) {
+            val travel = maxOf(pressed.coerceIn(0f, 1f), latched.coerceIn(0f, 1f))
+            scaleX = 1f - .06f * travel
+            scaleY = 1f - .10f * travel
+            alpha = 1f - .20f * pressed.coerceIn(0f, 1f)
+        }
+    }) {
         val press = pressed.coerceIn(0f, 1f)
         val isToggle = name == "fps" || name == "fast"
         if (isToggle) {
