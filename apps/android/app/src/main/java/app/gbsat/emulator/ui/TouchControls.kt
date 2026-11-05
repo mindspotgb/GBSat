@@ -2,6 +2,7 @@ package app.gbsat.emulator.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.animation.core.animateFloatAsState
@@ -151,31 +152,105 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         val w = maxWidth
         val h = maxHeight
         val artwork = ImageBitmap.imageResource(art)
-        val crop = if (panel == 0) 1f else ((w.value / h.value) / (232f / 400f)).coerceIn(.1f, 1f)
-        val cropStart = (1f - crop) / 2f
+        val sourceAspect = artwork.width.toFloat() / artwork.height
+        val targetAspect = w.value / h.value
+        // Keep the portrait art at its native proportions so circular controls stay circular. Landscape panels
+        // show a little more horizontal artwork than a centered Crop, preserving the outer action labels.
+        val crop = when (panel) {
+            0 -> (targetAspect / sourceAspect).coerceIn(.1f, 1f)
+            else -> maxOf((targetAspect / sourceAspect).coerceIn(.1f, 1f), .84f)
+        }
+        val cropStart = when (panel) {
+            1 -> .08f
+            2 -> .06f
+            else -> (1f - crop) / 2f
+        }.coerceIn(0f, 1f - crop)
         fun cx(x: Float) = ((x - cropStart) / crop).coerceIn(0f, 1f)
-        fun cw(size: Float) = (size / crop).coerceIn(.04f, .8f)
-        Image(painterResource(art), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = if (panel == 0) ContentScale.FillBounds else ContentScale.Crop)
+        fun cw(size: Float) = (size / crop).coerceIn(.04f, 1f)
+        Canvas(Modifier.fillMaxSize().background(Color(0xFF15161A))) {
+            val sourceLeft = (cropStart * artwork.width).toInt().coerceIn(0, artwork.width - 1)
+            val sourceWidth = (crop * artwork.width).toInt().coerceIn(1, artwork.width - sourceLeft)
+            drawImage(
+                image = artwork,
+                srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, 0),
+                srcSize = IntSize(sourceWidth, artwork.height),
+                dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)),
+            )
+        }
         @Composable fun button(x: Float, y: Float, bw: Float, bh: Float, key: String, onPressed: (Boolean) -> Unit, latched: Boolean = false) {
-            val bx = if (panel == 0) x else cx(x)
-            val buttonW = if (panel == 0) bw else cw(bw)
+            val bx = cx(x)
+            val buttonW = cw(bw)
             PressArea(key, onPressed, Modifier.offset(x = w * (bx - buttonW / 2), y = h * (y - bh / 2)).size(w * buttonW, h * bh)) { down ->
                 val amount by animateFloatAsState(if (down || latched) 1f else 0f, tween(if (down || latched) 65 else 140), label = key)
-                androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val portraitStateAction = panel == 0 && (key == "art-0-load" || key == "art-0-save")
+                if (portraitStateAction) {
+                    val isLoad = key.endsWith("load")
+                    Row(
+                        modifier = Modifier.fillMaxSize()
+                            .graphicsLayer {
+                                val scale = 1f - amount * .045f
+                                scaleX = scale
+                                scaleY = scale
+                                translationY = amount * 1.5.dp.toPx()
+                            }
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xC91A1B20))
+                            .border(1.dp, Color.White.copy(alpha = if (down) .48f else .24f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (isLoad) Icons.Default.Refresh else Icons.Default.Download,
+                            contentDescription = null,
+                            tint = Color(0xFFD6D7DB),
+                            modifier = Modifier.size(13.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            if (isLoad) "LOAD" else "SAVE",
+                            color = Color(0xFFE1E2E5),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    }
+                } else androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                     if (amount > 0f) {
-                        val insetX = (size.width * .035f * amount).toInt()
-                        val insetY = (size.height * .035f * amount).toInt()
-                        drawImage(artwork,
-                            srcOffset = androidx.compose.ui.unit.IntOffset(((x - bw / 2) * artwork.width).toInt(), ((y - bh / 2) * artwork.height).toInt()),
-                            srcSize = IntSize((bw * artwork.width).toInt().coerceAtLeast(1), (bh * artwork.height).toInt().coerceAtLeast(1)),
+                        val insetX = (size.width * .045f * amount).toInt()
+                        val insetY = (size.height * .055f * amount).toInt()
+                        val srcLeft = ((x - bw / 2) * artwork.width).toInt().coerceIn(0, artwork.width - 1)
+                        val srcTop = ((y - bh / 2) * artwork.height).toInt().coerceIn(0, artwork.height - 1)
+                        val srcWidth = (bw * artwork.width).toInt().coerceIn(1, artwork.width - srcLeft)
+                        val srcHeight = (bh * artwork.height).toInt().coerceIn(1, artwork.height - srcTop)
+                        drawImage(
+                            artwork,
+                            srcOffset = androidx.compose.ui.unit.IntOffset(srcLeft, srcTop),
+                            srcSize = IntSize(srcWidth, srcHeight),
                             dstOffset = androidx.compose.ui.unit.IntOffset(insetX, insetY * 2),
                             dstSize = IntSize((size.width.toInt() - insetX * 2).coerceAtLeast(1), (size.height.toInt() - insetY * 2).coerceAtLeast(1)),
-                            alpha = amount)
-                        drawRect(Color.Black.copy(alpha = amount * .12f))
+                            alpha = amount,
+                        )
+                        drawRect(Color.Black.copy(alpha = amount * if (key.endsWith("fast") || latched) .24f else .12f))
+                        if (key.endsWith("fast") || latched) {
+                            val accent = Color(0xFF58D68D).copy(alpha = .96f * amount)
+                            drawRoundRect(
+                                color = accent,
+                                topLeft = Offset(insetX.toFloat(), insetY.toFloat()),
+                                size = androidx.compose.ui.geometry.Size(
+                                    (size.width - insetX * 2).coerceAtLeast(1f),
+                                    (size.height - insetY * 2).coerceAtLeast(1f),
+                                ),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height * .35f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()),
+                            )
+                            drawCircle(
+                                color = accent,
+                                radius = size.minDimension * .075f,
+                                center = Offset(size.width * .84f, size.height * .16f),
+                            )
+                        }
                     }
-                }
-                if (panel == 0 && (key == "art-0-load" || key == "art-0-save")) {
-                    Text(key.substringAfterLast('-').uppercase(), color = Color(0xFFB8BBC0), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -188,8 +263,8 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         @Composable fun directions(x: Float, y: Float, size: Float) {
             var active by remember { mutableStateOf(emptySet<TouchDirection>()) }
             val glow by animateFloatAsState(if (active.isEmpty()) 0f else 1f, tween(100), label = "saturn-direction")
-            val dpadSize = if (panel == 0) w * size else h * .34f
-            val dx = if (panel == 0) x else cx(x)
+            val dpadSize = if (panel == 0) w * (size / crop) else h * (size * sourceAspect)
+            val dx = cx(x)
             Box(Modifier.offset(x = w * dx - dpadSize / 2, y = h * y - dpadSize / 2).size(dpadSize)) {
             TouchDPad(onDirectionsChanged = { dirs ->
                 active = dirs
@@ -205,40 +280,35 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                 center = Color.Transparent, arrow = Color.Transparent, border = Color.Transparent)
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                 if (glow > 0f) {
-                    val dy = size * (w.value / h.value)
-                    val shiftX = ((if (TouchDirection.RIGHT in active) 1 else 0) - (if (TouchDirection.LEFT in active) 1 else 0)) * 2.dp.toPx() * glow
-                    val shiftY = ((if (TouchDirection.DOWN in active) 1 else 0) - (if (TouchDirection.UP in active) 1 else 0)) * 2.dp.toPx() * glow
-                    drawImage(artwork,
-                        srcOffset = androidx.compose.ui.unit.IntOffset(((x - size / 2) * artwork.width).toInt(), ((y - dy / 2) * artwork.height).toInt()),
-                        srcSize = IntSize((size * artwork.width).toInt().coerceAtLeast(1), (dy * artwork.height).toInt().coerceAtLeast(1)),
-                        dstOffset = androidx.compose.ui.unit.IntOffset(shiftX.toInt(), shiftY.toInt()),
-                        dstSize = IntSize(this.size.width.toInt().coerceAtLeast(1), this.size.height.toInt().coerceAtLeast(1)), alpha = glow)
+                    // Animate only the selected direction. Repainting a rectangular crop of the textured panel
+                    // created visible seams around the circular D-pad and could distort its proportions.
+                    val tint = Color.White.copy(alpha = .34f * glow)
+                    val radius = this.size.minDimension * (.10f + .015f * glow)
+                    if (TouchDirection.UP in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .20f))
+                    if (TouchDirection.DOWN in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .80f))
+                    if (TouchDirection.LEFT in active) drawCircle(tint, radius, Offset(this.size.width * .20f, this.size.height * .5f))
+                    if (TouchDirection.RIGHT in active) drawCircle(tint, radius, Offset(this.size.width * .80f, this.size.height * .5f))
                 }
-                val tint = Color.Black.copy(alpha = .42f * glow)
-                val radius = this.size.minDimension * .11f
-                if (TouchDirection.UP in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .20f))
-                if (TouchDirection.DOWN in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .80f))
-                if (TouchDirection.LEFT in active) drawCircle(tint, radius, Offset(this.size.width * .20f, this.size.height * .5f))
-                if (TouchDirection.RIGHT in active) drawCircle(tint, radius, Offset(this.size.width * .80f, this.size.height * .5f))
             }
             }
         }
         if (panel == 0) {
             saturn(.17f,.10f,.24f,.12f,SaturnButton.L); saturn(.83f,.10f,.24f,.12f,SaturnButton.R)
-            action(.36f,.14f,.18f,.055f,"load",a.onLoad); action(.64f,.14f,.18f,.055f,"save",a.onSave)
+            action(.36f,.13f,.19f,.06f,"load",a.onLoad); action(.64f,.13f,.19f,.06f,"save",a.onSave)
             directions(.26f,.47f,.36f)
             saturn(.58f,.43f,.12f,.10f,SaturnButton.X); saturn(.70f,.38f,.12f,.10f,SaturnButton.Y); saturn(.83f,.35f,.12f,.10f,SaturnButton.Z)
             saturn(.60f,.55f,.13f,.10f,SaturnButton.A); saturn(.74f,.49f,.13f,.10f,SaturnButton.B); saturn(.88f,.46f,.13f,.10f,SaturnButton.C)
-            action(.28f,.94f,.16f,.09f,"fast",a.onFast,Emulator.fastForward); action(.50f,.94f,.16f,.09f,"menu",a.onMenu); saturn(.72f,.94f,.16f,.09f,SaturnButton.Start)
+            // The bottom row in the portrait artwork is centered at about 84% height, not 94%.
+            action(.28f,.84f,.16f,.09f,"fast",a.onFast,Emulator.fastForward); action(.50f,.84f,.16f,.09f,"menu",a.onMenu); saturn(.72f,.84f,.16f,.09f,SaturnButton.Start)
         } else if (panel == 1) {
-            saturn(.36f,.07f,.55f,.12f,SaturnButton.L); action(.80f,.08f,.18f,.09f,"load",a.onLoad)
+            saturn(.36f,.12f,.55f,.15f,SaturnButton.L); action(.80f,.15f,.20f,.13f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
-            action(.46f,.97f,.30f,.08f,"fast",a.onFast,Emulator.fastForward); saturn(.80f,.97f,.30f,.08f,SaturnButton.Start)
+            action(.46f,.93f,.24f,.09f,"fast",a.onFast,Emulator.fastForward); saturn(.80f,.93f,.24f,.09f,SaturnButton.Start)
         } else {
-            saturn(.64f,.07f,.58f,.12f,SaturnButton.R); action(.21f,.08f,.18f,.09f,"save",a.onSave)
+            saturn(.64f,.15f,.58f,.15f,SaturnButton.R); action(.21f,.15f,.20f,.13f,"save",a.onSave)
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
             saturn(.22f,.74f,.23f,.12f,SaturnButton.A); saturn(.46f,.67f,.23f,.12f,SaturnButton.B); saturn(.72f,.63f,.23f,.12f,SaturnButton.C)
-            action(.21f,.97f,.28f,.08f,"filters",a.onFilters); action(.54f,.97f,.28f,.08f,"menu",a.onMenu)
+            action(.21f,.92f,.28f,.09f,"filters",a.onFilters); action(.54f,.92f,.28f,.09f,"menu",a.onMenu)
         }
     }
 }
