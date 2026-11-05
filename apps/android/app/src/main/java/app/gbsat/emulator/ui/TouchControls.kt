@@ -52,6 +52,7 @@ import gb.frame.TouchControlsOverlay
 import gb.frame.TouchControlsPlacement
 import gb.frame.TouchDirection
 import gb.frame.SaturnControllerV12
+import gb.frame.saturnControllerV12PortraitArtworkSize
 import gb.frame.SaturnButton as KitSaturnButton
 import gb.frame.SaturnDirection as KitSaturnDirection
 import kotlinx.coroutines.launch
@@ -142,11 +143,9 @@ fun TouchControls(
 @Composable
 private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
     BoxWithConstraints(modifier) {
-        val artAspect = 1112f / 1415f
-        val artWidth = minOf(maxWidth, maxHeight * artAspect)
-        val artHeight = artWidth / artAspect
+        val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, maxHeight)
         SaturnControllerV12(
-            modifier = Modifier.align(Alignment.TopCenter).size(artWidth, artHeight),
+            modifier = Modifier.align(Alignment.TopCenter).requiredSize(artSize),
             fpsEnabled = Emulator.showFps && Emulator.showSpeed,
             fastEnabled = Emulator.fastForward,
             hapticsEnabled = Emulator.touchHapticsEnabled,
