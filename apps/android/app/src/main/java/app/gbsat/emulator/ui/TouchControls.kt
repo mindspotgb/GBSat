@@ -149,10 +149,10 @@ private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions)
         } else {
             val edgeFill = Brush.verticalGradient(listOf(Color(0xFF292B31), Color(0xFF22242A), Color(0xFF292B31)))
             Box(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight().background(edgeFill)) {
-                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_panel_left, 1, a)
+                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_touch_landscape_left, 1, a)
             }
             Box(Modifier.align(Alignment.CenterEnd).width(side).fillMaxHeight().background(edgeFill)) {
-                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_panel_right, 2, a)
+                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_touch_landscape_right, 2, a)
             }
         }
     }
@@ -354,7 +354,7 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         } else if (panel == 1) {
             saturn(.36f,.12f,.55f,.15f,SaturnButton.L); action(.80f,.15f,.20f,.13f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
-            action(.27f,.92f,.22f,.11f,"fps",a.onFps); action(.48f,.93f,.22f,.09f,"fast",a.onFast,Emulator.fastForward); saturn(.80f,.93f,.24f,.09f,SaturnButton.Start)
+            action(.27f,.92f,.22f,.11f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed); action(.48f,.93f,.22f,.09f,"fast",a.onFast,Emulator.fastForward); saturn(.80f,.93f,.24f,.09f,SaturnButton.Start)
         } else {
             saturn(.64f,.15f,.58f,.15f,SaturnButton.R); action(.21f,.15f,.20f,.13f,"save",a.onSave)
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
