@@ -124,15 +124,7 @@ fun TouchControls(
 /** Artwork uses normalized hit regions so the same input positions follow the scaled image. */
 @Composable
 private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
-    Column(modifier) {
-        Row(Modifier.fillMaxWidth().height(42.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            StateAction("LOAD", Icons.Default.Refresh, a.onLoad)
-            StateAction("SAVE", Icons.Default.Download, a.onSave)
-        }
-        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
-            ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_panel_portrait, 0, a)
-        }
-    }
+    ArtworkPanel(modifier, R.drawable.saturn_panel_portrait, 0, a)
 }
 
 @Composable
@@ -142,14 +134,12 @@ private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions)
         if (Emulator.aspect == 1 || side < 100.dp) {
             LegacyLandscapePad(Modifier.fillMaxSize(), ratio, a)
         } else {
-            val artWidth = minOf(side, maxHeight * (232f / 400f))
-            val artHeight = artWidth * (400f / 232f)
             val edgeFill = Brush.verticalGradient(listOf(Color(0xFF292B31), Color(0xFF22242A), Color(0xFF292B31)))
             Box(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight().background(edgeFill)) {
-                ArtworkPanel(Modifier.align(Alignment.CenterEnd).width(artWidth).height(artHeight), R.drawable.saturn_panel_left, 1, a)
+                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_panel_left, 1, a)
             }
             Box(Modifier.align(Alignment.CenterEnd).width(side).fillMaxHeight().background(edgeFill)) {
-                ArtworkPanel(Modifier.align(Alignment.CenterStart).width(artWidth).height(artHeight), R.drawable.saturn_panel_right, 2, a)
+                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_panel_right, 2, a)
             }
         }
     }
@@ -161,10 +151,16 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         val w = maxWidth
         val h = maxHeight
         val artwork = ImageBitmap.imageResource(art)
-        Image(painterResource(art), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
-        @Composable fun button(x: Float, y: Float, bw: Float, bh: Float, key: String, onPressed: (Boolean) -> Unit) {
-            PressArea(key, onPressed, Modifier.offset(x = w * (x - bw / 2), y = h * (y - bh / 2)).size(w * bw, h * bh)) { down ->
-                val amount by animateFloatAsState(if (down) 1f else 0f, tween(if (down) 65 else 140), label = key)
+        val crop = if (panel == 0) 1f else ((w.value / h.value) / (232f / 400f)).coerceIn(.1f, 1f)
+        val cropStart = (1f - crop) / 2f
+        fun cx(x: Float) = ((x - cropStart) / crop).coerceIn(0f, 1f)
+        fun cw(size: Float) = (size / crop).coerceIn(.04f, .8f)
+        Image(painterResource(art), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = if (panel == 0) ContentScale.FillBounds else ContentScale.Crop)
+        @Composable fun button(x: Float, y: Float, bw: Float, bh: Float, key: String, onPressed: (Boolean) -> Unit, latched: Boolean = false) {
+            val bx = if (panel == 0) x else cx(x)
+            val buttonW = if (panel == 0) bw else cw(bw)
+            PressArea(key, onPressed, Modifier.offset(x = w * (bx - buttonW / 2), y = h * (y - bh / 2)).size(w * buttonW, h * bh)) { down ->
+                val amount by animateFloatAsState(if (down || latched) 1f else 0f, tween(if (down || latched) 65 else 140), label = key)
                 androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                     if (amount > 0f) {
                         val insetX = (size.width * .035f * amount).toInt()
@@ -178,18 +174,23 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                         drawRect(Color.Black.copy(alpha = amount * .12f))
                     }
                 }
+                if (panel == 0 && (key == "art-0-load" || key == "art-0-save")) {
+                    Text(key.substringAfterLast('-').uppercase(), color = Color(0xFFB8BBC0), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
         @Composable fun saturn(x: Float, y: Float, bw: Float, bh: Float, b: SaturnButton) {
-            button(x, y, bw, bh, "art-$panel-$b") { down -> TouchState.set(b, if (down) b.bit else 0) }
+            button(x, y, bw, bh, "art-$panel-$b", { down -> TouchState.set(b, if (down) b.bit else 0) })
         }
-        @Composable fun action(x: Float, y: Float, bw: Float, bh: Float, key: String, run: () -> Unit) {
-            button(x, y, bw, bh, "art-$panel-$key") { down -> if (down) run() }
+        @Composable fun action(x: Float, y: Float, bw: Float, bh: Float, key: String, run: () -> Unit, latched: Boolean = false) {
+            button(x, y, bw, bh, "art-$panel-$key", { down -> if (down) run() }, latched)
         }
         @Composable fun directions(x: Float, y: Float, size: Float) {
             var active by remember { mutableStateOf(emptySet<TouchDirection>()) }
             val glow by animateFloatAsState(if (active.isEmpty()) 0f else 1f, tween(100), label = "saturn-direction")
-            Box(Modifier.offset(x = w * (x - size / 2), y = h * (y - size * (w.value / h.value) / 2)).size(w * size)) {
+            val dpadSize = if (panel == 0) w * size else h * .34f
+            val dx = if (panel == 0) x else cx(x)
+            Box(Modifier.offset(x = w * dx - dpadSize / 2, y = h * y - dpadSize / 2).size(dpadSize)) {
             TouchDPad(onDirectionsChanged = { dirs ->
                 active = dirs
                 TouchState.set("dpad", dirs.fold(0) { bits, direction -> bits or when (direction) {
@@ -224,19 +225,20 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         }
         if (panel == 0) {
             saturn(.17f,.10f,.24f,.12f,SaturnButton.L); saturn(.83f,.10f,.24f,.12f,SaturnButton.R)
+            action(.36f,.14f,.18f,.055f,"load",a.onLoad); action(.64f,.14f,.18f,.055f,"save",a.onSave)
             directions(.26f,.47f,.36f)
             saturn(.58f,.43f,.12f,.10f,SaturnButton.X); saturn(.70f,.38f,.12f,.10f,SaturnButton.Y); saturn(.83f,.35f,.12f,.10f,SaturnButton.Z)
             saturn(.60f,.55f,.13f,.10f,SaturnButton.A); saturn(.74f,.49f,.13f,.10f,SaturnButton.B); saturn(.88f,.46f,.13f,.10f,SaturnButton.C)
-            action(.28f,.84f,.16f,.09f,"fast",a.onFast); action(.50f,.84f,.16f,.09f,"menu",a.onMenu); saturn(.72f,.84f,.16f,.09f,SaturnButton.Start)
+            action(.28f,.94f,.16f,.09f,"fast",a.onFast,Emulator.fastForward); action(.50f,.94f,.16f,.09f,"menu",a.onMenu); saturn(.72f,.94f,.16f,.09f,SaturnButton.Start)
         } else if (panel == 1) {
-            saturn(.36f,.13f,.55f,.16f,SaturnButton.L); action(.80f,.16f,.18f,.11f,"load",a.onLoad)
+            saturn(.36f,.07f,.55f,.12f,SaturnButton.L); action(.80f,.08f,.18f,.09f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
-            action(.46f,.93f,.30f,.10f,"fast",a.onFast); saturn(.80f,.93f,.30f,.10f,SaturnButton.Start)
+            action(.46f,.97f,.30f,.08f,"fast",a.onFast,Emulator.fastForward); saturn(.80f,.97f,.30f,.08f,SaturnButton.Start)
         } else {
-            saturn(.64f,.13f,.58f,.16f,SaturnButton.R); action(.21f,.16f,.18f,.11f,"save",a.onSave)
+            saturn(.64f,.07f,.58f,.12f,SaturnButton.R); action(.21f,.08f,.18f,.09f,"save",a.onSave)
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
             saturn(.22f,.74f,.23f,.12f,SaturnButton.A); saturn(.46f,.67f,.23f,.12f,SaturnButton.B); saturn(.72f,.63f,.23f,.12f,SaturnButton.C)
-            action(.21f,.93f,.28f,.10f,"filters",a.onFilters); action(.54f,.93f,.28f,.10f,"menu",a.onMenu)
+            action(.21f,.97f,.28f,.08f,"filters",a.onFilters); action(.54f,.97f,.28f,.08f,"menu",a.onMenu)
         }
     }
 }
