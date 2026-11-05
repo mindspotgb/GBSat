@@ -144,10 +144,11 @@ private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions)
         } else {
             val artWidth = minOf(side, maxHeight * (232f / 400f))
             val artHeight = artWidth * (400f / 232f)
-            Box(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight().background(ControllerBodyBottom)) {
+            val edgeFill = Brush.verticalGradient(listOf(Color(0xFF292B31), Color(0xFF22242A), Color(0xFF292B31)))
+            Box(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight().background(edgeFill)) {
                 ArtworkPanel(Modifier.align(Alignment.CenterEnd).width(artWidth).height(artHeight), R.drawable.saturn_panel_left, 1, a)
             }
-            Box(Modifier.align(Alignment.CenterEnd).width(side).fillMaxHeight().background(ControllerBodyBottom)) {
+            Box(Modifier.align(Alignment.CenterEnd).width(side).fillMaxHeight().background(edgeFill)) {
                 ArtworkPanel(Modifier.align(Alignment.CenterStart).width(artWidth).height(artHeight), R.drawable.saturn_panel_right, 2, a)
             }
         }
