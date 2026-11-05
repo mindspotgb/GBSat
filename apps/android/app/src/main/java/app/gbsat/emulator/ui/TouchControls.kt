@@ -51,6 +51,9 @@ import gb.frame.TouchControlsLayoutMetrics
 import gb.frame.TouchControlsOverlay
 import gb.frame.TouchControlsPlacement
 import gb.frame.TouchDirection
+import gb.frame.SaturnControllerV12
+import gb.frame.SaturnButton as KitSaturnButton
+import gb.frame.SaturnDirection as KitSaturnDirection
 import kotlinx.coroutines.launch
 import kotlin.math.hypot
 
@@ -138,7 +141,61 @@ fun TouchControls(
 /** Artwork uses normalized hit regions so the same input positions follow the scaled image. */
 @Composable
 private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
-    ArtworkPanel(modifier, R.drawable.saturn_touch_portrait, 0, a)
+    BoxWithConstraints(modifier) {
+        val artAspect = 1112f / 1415f
+        val artWidth = minOf(maxWidth, maxHeight * artAspect)
+        val artHeight = artWidth / artAspect
+        SaturnControllerV12(
+            modifier = Modifier.align(Alignment.TopCenter).size(artWidth, artHeight),
+            fpsEnabled = Emulator.showFps && Emulator.showSpeed,
+            fastEnabled = Emulator.fastForward,
+            hapticsEnabled = Emulator.touchHapticsEnabled,
+            onButton = { button, down ->
+                val coreButton = when (button) {
+                    KitSaturnButton.L -> SaturnButton.L
+                    KitSaturnButton.R -> SaturnButton.R
+                    KitSaturnButton.X -> SaturnButton.X
+                    KitSaturnButton.Y -> SaturnButton.Y
+                    KitSaturnButton.Z -> SaturnButton.Z
+                    KitSaturnButton.A -> SaturnButton.A
+                    KitSaturnButton.B -> SaturnButton.B
+                    KitSaturnButton.C -> SaturnButton.C
+                    KitSaturnButton.START -> SaturnButton.Start
+                    else -> null
+                }
+                if (coreButton != null) {
+                    TouchState.set(coreButton, if (down) coreButton.bit else 0)
+                } else if (down) {
+                    when (button) {
+                        KitSaturnButton.MENU -> a.onMenu()
+                        KitSaturnButton.SAVE -> a.onSave()
+                        KitSaturnButton.LOAD -> a.onLoad()
+                        KitSaturnButton.FILTERS -> a.onFilters()
+                        else -> Unit
+                    }
+                }
+            },
+            onDirection = { direction, down ->
+                val bits = if (!down) 0 else when (direction) {
+                    KitSaturnDirection.UP -> SaturnButton.Up.bit
+                    KitSaturnDirection.UP_RIGHT -> SaturnButton.Up.bit or SaturnButton.Right.bit
+                    KitSaturnDirection.RIGHT -> SaturnButton.Right.bit
+                    KitSaturnDirection.DOWN_RIGHT -> SaturnButton.Down.bit or SaturnButton.Right.bit
+                    KitSaturnDirection.DOWN -> SaturnButton.Down.bit
+                    KitSaturnDirection.DOWN_LEFT -> SaturnButton.Down.bit or SaturnButton.Left.bit
+                    KitSaturnDirection.LEFT -> SaturnButton.Left.bit
+                    KitSaturnDirection.UP_LEFT -> SaturnButton.Up.bit or SaturnButton.Left.bit
+                }
+                TouchState.set("saturn-v12-dpad", bits)
+            },
+            onFpsChange = {
+                Emulator.showFps = it
+                Emulator.showSpeed = it
+                Emulator.savePrefs()
+            },
+            onFastChange = { Emulator.toggleFastForward() },
+        )
+    }
 }
 
 @Composable
