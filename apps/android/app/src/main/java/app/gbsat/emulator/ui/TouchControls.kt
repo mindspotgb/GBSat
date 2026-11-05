@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.ContentScale
@@ -33,6 +34,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -140,8 +142,14 @@ private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions)
         if (Emulator.aspect == 1 || side < 100.dp) {
             LegacyLandscapePad(Modifier.fillMaxSize(), ratio, a)
         } else {
-            ArtworkPanel(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight(), R.drawable.saturn_panel_left, 1, a)
-            ArtworkPanel(Modifier.align(Alignment.CenterEnd).width(side).fillMaxHeight(), R.drawable.saturn_panel_right, 2, a)
+            val artWidth = minOf(side, maxHeight * (232f / 400f))
+            val artHeight = artWidth * (400f / 232f)
+            Box(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight().background(ControllerBodyBottom)) {
+                ArtworkPanel(Modifier.align(Alignment.CenterEnd).width(artWidth).height(artHeight), R.drawable.saturn_panel_left, 1, a)
+            }
+            Box(Modifier.align(Alignment.CenterEnd).width(side).fillMaxHeight().background(ControllerBodyBottom)) {
+                ArtworkPanel(Modifier.align(Alignment.CenterStart).width(artWidth).height(artHeight), R.drawable.saturn_panel_right, 2, a)
+            }
         }
     }
 }
@@ -151,15 +159,24 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
     BoxWithConstraints(modifier) {
         val w = maxWidth
         val h = maxHeight
+        val artwork = ImageBitmap.imageResource(art)
         Image(painterResource(art), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
         @Composable fun button(x: Float, y: Float, bw: Float, bh: Float, key: String, onPressed: (Boolean) -> Unit) {
             PressArea(key, onPressed, Modifier.offset(x = w * (x - bw / 2), y = h * (y - bh / 2)).size(w * bw, h * bh)) { down ->
                 val amount by animateFloatAsState(if (down) 1f else 0f, tween(if (down) 65 else 140), label = key)
-                Box(Modifier.fillMaxSize().graphicsLayer {
-                    scaleX = 1f - amount * .08f
-                    scaleY = 1f - amount * .08f
-                    alpha = amount
-                }.background(Color.Black.copy(alpha = .34f), CircleShape).border(1.dp, Color.White.copy(alpha = .38f), CircleShape))
+                androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                    if (amount > 0f) {
+                        val insetX = (size.width * .035f * amount).toInt()
+                        val insetY = (size.height * .035f * amount).toInt()
+                        drawImage(artwork,
+                            srcOffset = androidx.compose.ui.unit.IntOffset(((x - bw / 2) * artwork.width).toInt(), ((y - bh / 2) * artwork.height).toInt()),
+                            srcSize = IntSize((bw * artwork.width).toInt().coerceAtLeast(1), (bh * artwork.height).toInt().coerceAtLeast(1)),
+                            dstOffset = androidx.compose.ui.unit.IntOffset(insetX, insetY * 2),
+                            dstSize = IntSize((size.width.toInt() - insetX * 2).coerceAtLeast(1), (size.height.toInt() - insetY * 2).coerceAtLeast(1)),
+                            alpha = amount)
+                        drawRect(Color.Black.copy(alpha = amount * .12f))
+                    }
+                }
             }
         }
         @Composable fun saturn(x: Float, y: Float, bw: Float, bh: Float, b: SaturnButton) {
@@ -185,7 +202,17 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                 track = Color.Transparent, normal = Color.Transparent, selected = Color.Transparent,
                 center = Color.Transparent, arrow = Color.Transparent, border = Color.Transparent)
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                val tint = Color.White.copy(alpha = .38f * glow)
+                if (glow > 0f) {
+                    val dy = size * (w.value / h.value)
+                    val shiftX = ((if (TouchDirection.RIGHT in active) 1 else 0) - (if (TouchDirection.LEFT in active) 1 else 0)) * 2.dp.toPx() * glow
+                    val shiftY = ((if (TouchDirection.DOWN in active) 1 else 0) - (if (TouchDirection.UP in active) 1 else 0)) * 2.dp.toPx() * glow
+                    drawImage(artwork,
+                        srcOffset = androidx.compose.ui.unit.IntOffset(((x - size / 2) * artwork.width).toInt(), ((y - dy / 2) * artwork.height).toInt()),
+                        srcSize = IntSize((size * artwork.width).toInt().coerceAtLeast(1), (dy * artwork.height).toInt().coerceAtLeast(1)),
+                        dstOffset = androidx.compose.ui.unit.IntOffset(shiftX.toInt(), shiftY.toInt()),
+                        dstSize = IntSize(this.size.width.toInt().coerceAtLeast(1), this.size.height.toInt().coerceAtLeast(1)), alpha = glow)
+                }
+                val tint = Color.Black.copy(alpha = .42f * glow)
                 val radius = this.size.minDimension * .11f
                 if (TouchDirection.UP in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .20f))
                 if (TouchDirection.DOWN in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .80f))
