@@ -194,7 +194,8 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
             val buttonW = cw(bw)
             PressArea(key, onPressed, Modifier.offset(x = w * (bx - buttonW / 2), y = h * (y - bh / 2)).size(w * buttonW, h * bh)) { down ->
                 val amount by animateFloatAsState(
-                    if (down || latched) 1f else 0f,
+                    // Physical press is transient; toggle state is animated separately below.
+                    if (down) 1f else 0f,
                     spring(dampingRatio = .68f, stiffness = 620f),
                     label = key,
                 )
@@ -217,98 +218,10 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
 
                 val latchedProgress by animateFloatAsState(
                     if (latched) 1f else 0f,
-                    spring(dampingRatio = .76f, stiffness = 500f),
+                    tween(durationMillis = 180),
                     label = "$key-latched",
                 )
-                if (panel == 0) {
-                    PortraitArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress)
-                } else when {
-                    isPortraitStateAction -> {
-                        Column(
-                            Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            val scale = 1f - amount * .12f
-                            Box(
-                                Modifier.weight(1f).fillMaxHeight(.78f).aspectRatio(1f)
-                                    .graphicsLayer { scaleX = scale; scaleY = scale; translationY = amount * 1.5.dp.toPx() },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                                    val center = Offset(size.width / 2f, size.height / 2f)
-                                    val radius = size.minDimension * .48f
-                                    drawCircle(Color(0xFF08090B), radius, center)
-                                    drawCircle(Color(0xFF383A40), radius * .84f, center)
-                                    drawCircle(
-                                        Brush.verticalGradient(listOf(Color(0xFF92949A), Color(0xFF73767C), Color(0xFF4B4E54))),
-                                        radius = radius * .70f,
-                                        center = center,
-                                    )
-                                }
-                            }
-                            Text(if (isLoad) "LOAD" else "SAVE", color = LabelColor, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        }
-                    }
-                    isLandscapeStateAction -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                        if (amount > 0f) {
-                            val center = Offset(size.width * .5f, size.height * .42f + amount * 1.5.dp.toPx())
-                            val radius = size.minDimension * .34f
-                            drawCircle(Color.Black.copy(alpha = .32f * amount), radius, center)
-                            drawCircle(Color.White.copy(alpha = .22f * amount), radius * .72f, center, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
-                        }
-                    }
-                    isLandscapePrintedAction -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                        if (amount > 0f || (name == "fast" && latched)) {
-                            val center = Offset(size.width * .83f, size.height * .22f)
-                            val radius = size.minDimension * if (name == "fast") .085f else .24f
-                            if (name == "fast" && latched) {
-                                drawCircle(Color(0xFFFFB84D).copy(alpha = .25f), radius * 1.9f, center)
-                                drawCircle(Color(0xFFFFC15A), radius, center)
-                            } else drawCircle(Color.Black.copy(alpha = .20f * amount), radius, center)
-                        }
-                    }
-                    name in setOf("fps", "fast", "menu", "filters", "Start") -> {
-                        Column(
-                            Modifier.fillMaxSize().padding(vertical = 1.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text(pillLabel, color = LabelColor, fontSize = if (panel == 0) 9.sp else 8.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Spacer(Modifier.height(2.dp))
-                            Box(
-                                Modifier.fillMaxWidth(.82f).weight(1f)
-                                    .graphicsLayer { scaleX = 1f - amount * .07f; scaleY = 1f - amount * .07f; translationY = amount * 1.5.dp.toPx() }
-                                    .clip(CircleShape)
-                                    .background(Brush.verticalGradient(listOf(pillTint.lighten(.22f), pillTint, pillTint.darken(if (down || (name == "fast" && latched)) .30f else .10f))))
-                                    .border(1.dp, Color.Black.copy(alpha = .34f), CircleShape),
-                                contentAlignment = Alignment.CenterEnd,
-                            ) {
-                                if (name == "fast" && latched) {
-                                    Box(Modifier.padding(end = 5.dp).size(5.dp).background(Color(0xFFFFC15A), CircleShape))
-                                }
-                            }
-                        }
-                    }
-                    isStart -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                        if (amount > 0f) drawCircle(Color.White.copy(alpha = .25f * amount), size.minDimension * .16f)
-                    }
-                    else -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                        if (amount > 0f) {
-                            val nameIsFace = name in setOf("A", "B", "C", "X", "Y", "Z")
-                            val inset = size.minDimension * .07f * amount
-                            if (nameIsFace) {
-                                val radius = (size.minDimension * .5f - inset).coerceAtLeast(1f)
-                                val center = Offset(size.width * .5f, size.height * .5f + amount * 1.5.dp.toPx())
-                                drawCircle(Color.Black.copy(alpha = .4f * amount), radius, center)
-                                drawCircle(Color.White.copy(alpha = .2f * amount), radius * .9f, center, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
-                            } else {
-                                drawRoundRect(Color.Black.copy(alpha = .34f * amount), topLeft = Offset(inset, inset + amount * 1.5.dp.toPx()), size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .35f))
-                                drawRoundRect(Color.White.copy(alpha = .18f * amount), topLeft = Offset(inset, inset), size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .35f), style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
-                            }
-                        }
-                    }
-                }
+                ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress)
             }
         }
         @Composable fun saturn(x: Float, y: Float, bw: Float, bh: Float, b: SaturnButton) {
@@ -366,7 +279,7 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
 
 /** Adds a subtle, console-like depression over the printed buttons without covering the supplied Saturn artwork. */
 @Composable
-private fun PortraitArtworkPressEffect(
+private fun ControllerArtworkPressEffect(
     modifier: Modifier,
     name: String,
     pressed: Float,
@@ -477,6 +390,26 @@ private fun DPadPressEffect(modifier: Modifier, up: Float, down: Float, left: Fl
         val min = size.minDimension
         val centerX = size.width * .5f
         val centerY = size.height * .5f
+        // Directional arms depress independently, so simultaneous axes naturally form diagonals.
+        // Shift the well's shadow/highlight around its center pivot to reinforce that movement.
+        val horizontal = (right - left).coerceIn(-1f, 1f)
+        val vertical = (down - up).coerceIn(-1f, 1f)
+        val activity = maxOf(up, down, left, right).coerceIn(0f, 1f)
+        if (activity > .01f) {
+            val pivotOffset = Offset(horizontal * min * .025f, vertical * min * .025f)
+            val wellRadius = min * .34f
+            drawCircle(
+                Color.Black.copy(alpha = .26f * activity),
+                wellRadius,
+                Offset(centerX, centerY) + pivotOffset,
+            )
+            drawCircle(
+                Color.White.copy(alpha = .17f * activity),
+                wellRadius * .92f,
+                Offset(centerX, centerY) - pivotOffset,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(min * .018f),
+            )
+        }
         val arm = min * .30f
         val length = min * .34f
         fun press(progress: Float, direction: TouchDirection) {
