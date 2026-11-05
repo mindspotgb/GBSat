@@ -45,6 +45,7 @@ import app.gbsat.emulator.Emulator
 import app.gbsat.emulator.NativeBridge
 import app.gbsat.emulator.SaturnButton
 import app.gbsat.emulator.R
+import gb.frame.MechanicalArtworkPress
 import gb.frame.TouchDPad
 import gb.frame.TouchControlsLayoutMetrics
 import gb.frame.TouchControlsOverlay
@@ -221,7 +222,11 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                     tween(durationMillis = 180),
                     label = "$key-latched",
                 )
-                ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress)
+                if (name != "fps" && name != "fast") {
+                    MechanicalArtworkPress(artwork, x, y, bw, bh, name, amount)
+                } else {
+                    ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress, true)
+                }
             }
         }
         @Composable fun saturn(x: Float, y: Float, bw: Float, bh: Float, b: SaturnButton) {
@@ -251,7 +256,23 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                 modifier = Modifier.fillMaxSize(),
                 track = Color.Transparent, normal = Color.Transparent, selected = Color.Transparent,
                 center = Color.Transparent, arrow = Color.Transparent, border = Color.Transparent)
-            DPadPressEffect(Modifier.fillMaxSize(), up, down, left, right)
+            if (maxOf(up, down, left, right) > .001f) {
+                val sourceSize = (size * artwork.width).toInt().coerceAtLeast(1)
+                val sourceLeft = (x * artwork.width - sourceSize / 2f).toInt().coerceIn(0, artwork.width - sourceSize)
+                val sourceTop = (y * artwork.height - sourceSize / 2f).toInt().coerceIn(0, artwork.height - sourceSize)
+                Canvas(Modifier.fillMaxSize().graphicsLayer {
+                    rotationX = (down - up) * 4f
+                    rotationY = (left - right) * 4f
+                    cameraDistance = 12f * density
+                }.clip(CircleShape)) {
+                    drawImage(artwork, srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
+                        srcSize = IntSize(sourceSize, sourceSize),
+                        dstSize = IntSize(this.size.width.toInt().coerceAtLeast(1), this.size.height.toInt().coerceAtLeast(1)))
+                    drawCircle(Color.Black.copy(alpha = .07f * maxOf(up, down, left, right)))
+                }
+            } else if (panel != 0) {
+                DPadPressEffect(Modifier.fillMaxSize(), up, down, left, right)
+            }
             }
         }
         if (panel == 0) {
@@ -284,6 +305,7 @@ private fun ControllerArtworkPressEffect(
     name: String,
     pressed: Float,
     latched: Float,
+    mechanical: Boolean = false,
 ) {
     Canvas(modifier) {
         val press = pressed.coerceIn(0f, 1f)
@@ -312,7 +334,7 @@ private fun ControllerArtworkPressEffect(
                     trackRadius,
                     style = androidx.compose.ui.graphics.drawscope.Stroke(1.2.dp.toPx()),
                 )
-                if (active > .01f) {
+                if (active > .01f && !mechanical) {
                     drawRoundRect(
                         Color(0xFFFFB84D).copy(alpha = .28f * active),
                         trackTopLeft,
