@@ -137,7 +137,7 @@ fun TouchControls(
 /** Artwork uses normalized hit regions so the same input positions follow the scaled image. */
 @Composable
 private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
-    ArtworkPanel(modifier, R.drawable.saturn_panel_portrait, 0, a)
+    ArtworkPanel(modifier, R.drawable.saturn_touch_portrait, 0, a)
 }
 
 @Composable
@@ -179,7 +179,7 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         }.coerceIn(0f, 1f - crop)
         fun cx(x: Float) = ((x - cropStart) / crop).coerceIn(0f, 1f)
         fun cw(size: Float) = (size / crop).coerceIn(.04f, 1f)
-        Canvas(Modifier.fillMaxSize().background(Color(0xFF15161A))) {
+        Canvas(Modifier.fillMaxSize().then(if (panel == 0) Modifier else Modifier.background(Color(0xFF15161A)))) {
             val sourceLeft = (cropStart * artwork.width).toInt().coerceIn(0, artwork.width - 1)
             val sourceWidth = (crop * artwork.width).toInt().coerceIn(1, artwork.width - sourceLeft)
             drawImage(
@@ -215,7 +215,14 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                 }
                 val pillTint = if (isStart) Crimson else GreyButton
 
-                when {
+                val latchedProgress by animateFloatAsState(
+                    if (latched) 1f else 0f,
+                    spring(dampingRatio = .76f, stiffness = 500f),
+                    label = "$key-latched",
+                )
+                if (panel == 0) {
+                    PortraitArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress)
+                } else when {
                     isPortraitStateAction -> {
                         Column(
                             Modifier.fillMaxSize(),
@@ -335,13 +342,15 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
             }
         }
         if (panel == 0) {
-            saturn(.17f,.10f,.24f,.12f,SaturnButton.L); saturn(.83f,.10f,.24f,.12f,SaturnButton.R)
-            action(.17f,.23f,.15f,.11f,"load",a.onLoad); action(.50f,.23f,.17f,.09f,"menu",a.onMenu); action(.83f,.23f,.15f,.11f,"save",a.onSave)
-            directions(.26f,.47f,.36f)
-            saturn(.58f,.43f,.12f,.10f,SaturnButton.X); saturn(.70f,.38f,.12f,.10f,SaturnButton.Y); saturn(.83f,.35f,.12f,.10f,SaturnButton.Z)
-            saturn(.60f,.55f,.13f,.10f,SaturnButton.A); saturn(.74f,.49f,.13f,.10f,SaturnButton.B); saturn(.88f,.46f,.13f,.10f,SaturnButton.C)
-            saturn(.50f,.70f,.17f,.09f,SaturnButton.Start)
-            action(.28f,.84f,.16f,.09f,"fps",a.onFps); action(.50f,.84f,.16f,.09f,"fast",a.onFast,Emulator.fastForward); action(.72f,.84f,.16f,.09f,"filters",a.onFilters)
+            saturn(.20f,.12f,.24f,.12f,SaturnButton.L); saturn(.81f,.12f,.24f,.12f,SaturnButton.R)
+            action(.73f,.22f,.13f,.10f,"load",a.onLoad); action(.50f,.12f,.16f,.08f,"menu",a.onMenu); action(.28f,.22f,.13f,.10f,"save",a.onSave)
+            directions(.28f,.47f,.38f)
+            saturn(.58f,.44f,.12f,.10f,SaturnButton.X); saturn(.70f,.38f,.12f,.10f,SaturnButton.Y); saturn(.82f,.36f,.12f,.10f,SaturnButton.Z)
+            saturn(.60f,.55f,.13f,.10f,SaturnButton.A); saturn(.73f,.49f,.13f,.10f,SaturnButton.B); saturn(.86f,.46f,.13f,.10f,SaturnButton.C)
+            saturn(.50f,.70f,.16f,.08f,SaturnButton.Start)
+            action(.27f,.81f,.20f,.085f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed)
+            action(.50f,.81f,.19f,.085f,"filters",a.onFilters)
+            action(.74f,.81f,.20f,.085f,"fast",a.onFast,Emulator.fastForward)
         } else if (panel == 1) {
             saturn(.36f,.12f,.55f,.15f,SaturnButton.L); action(.80f,.15f,.20f,.13f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
@@ -351,6 +360,113 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
             saturn(.22f,.74f,.23f,.12f,SaturnButton.A); saturn(.46f,.67f,.23f,.12f,SaturnButton.B); saturn(.72f,.63f,.23f,.12f,SaturnButton.C)
             action(.21f,.92f,.28f,.09f,"filters",a.onFilters); action(.54f,.92f,.28f,.09f,"menu",a.onMenu)
+        }
+    }
+}
+
+/** Adds a subtle, console-like depression over the printed buttons without covering the supplied Saturn artwork. */
+@Composable
+private fun PortraitArtworkPressEffect(
+    modifier: Modifier,
+    name: String,
+    pressed: Float,
+    latched: Float,
+) {
+    Canvas(modifier) {
+        val press = pressed.coerceIn(0f, 1f)
+        val isToggle = name == "fps" || name == "fast"
+        if (isToggle) {
+            val active = latched.coerceIn(0f, 1f)
+            if (press > .01f || active > .01f) {
+                val trackLeft = size.width * .045f
+                val trackTop = size.height * .16f
+                val trackWidth = size.width * .91f
+                val trackHeight = size.height * .72f
+                val trackTopLeft = Offset(trackLeft, trackTop)
+                val trackSize = androidx.compose.ui.geometry.Size(trackWidth, trackHeight)
+                val trackRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight * .5f)
+                drawRoundRect(Color.Black.copy(alpha = .56f), trackTopLeft + Offset(0f, trackHeight * .08f), trackSize, trackRadius)
+                drawRoundRect(
+                    Brush.verticalGradient(listOf(Color(0xFF111214), Color(0xFF050607), Color(0xFF1A1B1E))),
+                    trackTopLeft,
+                    trackSize,
+                    trackRadius,
+                )
+                drawRoundRect(
+                    Color.White.copy(alpha = .18f + active * .22f),
+                    trackTopLeft,
+                    trackSize,
+                    trackRadius,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(1.2.dp.toPx()),
+                )
+                if (active > .01f) {
+                    drawRoundRect(
+                        Color(0xFFFFB84D).copy(alpha = .28f * active),
+                        trackTopLeft,
+                        trackSize,
+                        trackRadius,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()),
+                    )
+                }
+
+                val knobRadius = trackHeight * .34f * (1f - press * .08f)
+                val knobX = trackLeft + knobRadius + (trackWidth - knobRadius * 2f) * active
+                val knobY = trackTop + trackHeight * .5f + trackHeight * .035f * press
+                val knobCenter = Offset(knobX, knobY)
+                drawCircle(Color.Black.copy(alpha = .72f), knobRadius, knobCenter + Offset(0f, trackHeight * .08f))
+                drawCircle(
+                    Brush.verticalGradient(listOf(Color(0xFFC5C7CC), Color(0xFF74777D), Color(0xFF36383D))),
+                    knobRadius,
+                    knobCenter,
+                )
+                drawCircle(
+                    Color.White.copy(alpha = .38f),
+                    knobRadius * .83f,
+                    knobCenter - Offset(0f, knobRadius * .05f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
+                )
+            }
+            return@Canvas
+        }
+
+        if (press <= .01f) return@Canvas
+        val faceButton = name in setOf("A", "B", "C", "X", "Y", "Z")
+        val stateButton = name == "load" || name == "save"
+        val center = Offset(size.width * .5f, size.height * .5f + size.minDimension * .035f * press)
+        when {
+            faceButton || stateButton -> {
+                val radius = size.minDimension * if (stateButton) .26f else .43f
+                val compressedRadius = radius * (1f - .055f * press)
+                drawCircle(Color.Black.copy(alpha = .64f * press), radius, center + Offset(0f, size.minDimension * .07f * press))
+                drawCircle(Color.Black.copy(alpha = .31f * press), compressedRadius, center)
+                drawCircle(
+                    Color.White.copy(alpha = .30f * press),
+                    compressedRadius * .82f,
+                    center - Offset(0f, size.minDimension * .018f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(1.15.dp.toPx()),
+                )
+            }
+            name == "L" || name == "R" -> {
+                val inset = size.minDimension * .10f * press
+                val topLeft = Offset(inset, inset + size.minDimension * .045f * press)
+                val buttonSize = androidx.compose.ui.geometry.Size(size.width - inset * 2f, size.height - inset * 2f)
+                val radius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .38f)
+                drawRoundRect(Color.Black.copy(alpha = .62f * press), topLeft + Offset(0f, size.minDimension * .06f * press), buttonSize, radius)
+                drawRoundRect(Color.Black.copy(alpha = .20f * press), topLeft, buttonSize, radius)
+                drawRoundRect(Color.White.copy(alpha = .24f * press), topLeft, buttonSize, radius, style = androidx.compose.ui.graphics.drawscope.Stroke(1.2.dp.toPx()))
+            }
+            else -> {
+                val insetX = size.width * .07f * press
+                val insetY = size.height * .11f * press
+                val topLeft = Offset(insetX, insetY + size.height * .045f * press)
+                val buttonSize = androidx.compose.ui.geometry.Size(size.width - insetX * 2f, size.height - insetY * 2f)
+                val radius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .36f)
+                val shadow = Color.Black.copy(alpha = .64f * press)
+                drawRoundRect(shadow, topLeft + Offset(0f, size.height * .06f * press), buttonSize, radius)
+                drawRoundRect(Color.Black.copy(alpha = .24f * press), topLeft, buttonSize, radius)
+                if (name == "Start") drawRoundRect(Crimson.copy(alpha = .23f * press), topLeft, buttonSize, radius)
+                drawRoundRect(Color.White.copy(alpha = .30f * press), topLeft, buttonSize, radius, style = androidx.compose.ui.graphics.drawscope.Stroke(1.2.dp.toPx()))
+            }
         }
     }
 }
@@ -366,20 +482,27 @@ private fun DPadPressEffect(modifier: Modifier, up: Float, down: Float, left: Fl
         fun press(progress: Float, direction: TouchDirection) {
             if (progress <= .01f) return
             val travel = min * .035f * progress
+            val movement = when (direction) {
+                TouchDirection.UP -> Offset(0f, travel)
+                TouchDirection.DOWN -> Offset(0f, -travel)
+                TouchDirection.LEFT -> Offset(travel, 0f)
+                TouchDirection.RIGHT -> Offset(-travel, 0f)
+            }
             val topLeft = when (direction) {
-                TouchDirection.UP -> Offset(centerX - arm / 2, centerY - length + travel)
-                TouchDirection.DOWN -> Offset(centerX - arm / 2, centerY + travel)
-                TouchDirection.LEFT -> Offset(centerX - length + travel, centerY - arm / 2)
-                TouchDirection.RIGHT -> Offset(centerX + travel, centerY - arm / 2)
+                TouchDirection.UP -> Offset(centerX - arm / 2, centerY - length) + movement
+                TouchDirection.DOWN -> Offset(centerX - arm / 2, centerY) + movement
+                TouchDirection.LEFT -> Offset(centerX - length, centerY - arm / 2) + movement
+                TouchDirection.RIGHT -> Offset(centerX, centerY - arm / 2) + movement
             }
             val boxSize = if (direction == TouchDirection.UP || direction == TouchDirection.DOWN) {
                 androidx.compose.ui.geometry.Size(arm, length)
             } else androidx.compose.ui.geometry.Size(length, arm)
             val corner = androidx.compose.ui.geometry.CornerRadius(arm * .18f)
-            drawRoundRect(Color.Black.copy(alpha = .38f * progress), topLeft, boxSize, corner)
+            drawRoundRect(Color.Black.copy(alpha = .52f * progress), topLeft + movement * .35f, boxSize, corner)
+            drawRoundRect(Color.Black.copy(alpha = .24f * progress), topLeft, boxSize, corner)
             drawRoundRect(
-                Color.White.copy(alpha = .20f * progress),
-                topLeft = topLeft + Offset(1.dp.toPx(), -travel * .25f),
+                Color.White.copy(alpha = .26f * progress),
+                topLeft = topLeft - movement * .35f + Offset(1.dp.toPx(), -1.dp.toPx()),
                 size = boxSize,
                 cornerRadius = corner,
                 style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
