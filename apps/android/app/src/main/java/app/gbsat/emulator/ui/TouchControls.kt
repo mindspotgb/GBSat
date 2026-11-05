@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -73,7 +74,12 @@ private val ControllerBodyTop = Color(0xFF292B31)
 private val ControllerBodyBottom = Color(0xFF111216)
 
 private class PadActions(
-    val onLoad: () -> Unit, val onSave: () -> Unit, val onFast: () -> Unit, val onFilters: () -> Unit, val onMenu: () -> Unit,
+    val onLoad: () -> Unit,
+    val onSave: () -> Unit,
+    val onFast: () -> Unit,
+    val onFilters: () -> Unit,
+    val onMenu: () -> Unit,
+    val onFps: () -> Unit,
 )
 
 /**
@@ -100,6 +106,12 @@ fun TouchControls(
             Emulator.showToast("Shader: " + gb.frame.Shaders.name(Emulator.shader))
         },
         onMenu = onMenu,
+        onFps = {
+            val show = !(Emulator.showFps && Emulator.showSpeed)
+            Emulator.showFps = show
+            Emulator.showSpeed = show
+            Emulator.savePrefs()
+        },
     )
     if (responsiveLayout) {
         TouchControlsOverlay(
@@ -181,74 +193,112 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
             val bx = cx(x)
             val buttonW = cw(bw)
             PressArea(key, onPressed, Modifier.offset(x = w * (bx - buttonW / 2), y = h * (y - bh / 2)).size(w * buttonW, h * bh)) { down ->
-                val amount by animateFloatAsState(if (down || latched) 1f else 0f, tween(if (down || latched) 65 else 140), label = key)
-                val portraitStateAction = panel == 0 && (key == "art-0-load" || key == "art-0-save")
-                if (portraitStateAction) {
-                    val isLoad = key.endsWith("load")
-                    Row(
-                        modifier = Modifier.fillMaxSize()
-                            .graphicsLayer {
-                                val scale = 1f - amount * .045f
-                                scaleX = scale
-                                scaleY = scale
-                                translationY = amount * 1.5.dp.toPx()
+                val amount by animateFloatAsState(
+                    if (down || latched) 1f else 0f,
+                    spring(dampingRatio = .68f, stiffness = 620f),
+                    label = key,
+                )
+                val name = key.substringAfterLast('-')
+                val isLoad = name == "load"
+                val isSave = name == "save"
+                val isPortraitStateAction = panel == 0 && (isLoad || isSave)
+                val isLandscapeStateAction = panel != 0 && (isLoad || isSave)
+                val isLandscapePrintedAction = panel != 0 && name in setOf("fast", "filters", "menu", "Start")
+                val isStart = name == "Start"
+                val pillLabel = when (name) {
+                    "fps" -> "FPS"
+                    "fast" -> "FAST"
+                    "menu" -> "MENU"
+                    "filters" -> "FILTERS"
+                    "Start" -> "START"
+                    else -> ""
+                }
+                val pillTint = if (isStart) Crimson else GreyButton
+
+                when {
+                    isPortraitStateAction -> {
+                        Column(
+                            Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            val scale = 1f - amount * .12f
+                            Box(
+                                Modifier.weight(1f).fillMaxHeight(.78f).aspectRatio(1f)
+                                    .graphicsLayer { scaleX = scale; scaleY = scale; translationY = amount * 1.5.dp.toPx() },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                                    val center = Offset(size.width / 2f, size.height / 2f)
+                                    val radius = size.minDimension * .48f
+                                    drawCircle(Color(0xFF08090B), radius, center)
+                                    drawCircle(Color(0xFF383A40), radius * .84f, center)
+                                    drawCircle(
+                                        Brush.verticalGradient(listOf(Color(0xFF92949A), Color(0xFF73767C), Color(0xFF4B4E54))),
+                                        radius = radius * .70f,
+                                        center = center,
+                                    )
+                                }
                             }
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xC91A1B20))
-                            .border(1.dp, Color.White.copy(alpha = if (down) .48f else .24f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(
-                            imageVector = if (isLoad) Icons.Default.Refresh else Icons.Default.Download,
-                            contentDescription = null,
-                            tint = Color(0xFFD6D7DB),
-                            modifier = Modifier.size(13.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            if (isLoad) "LOAD" else "SAVE",
-                            color = Color(0xFFE1E2E5),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                        )
+                            Text(if (isLoad) "LOAD" else "SAVE", color = LabelColor, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
                     }
-                } else androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                    if (amount > 0f) {
-                        val insetX = (size.width * .045f * amount).toInt()
-                        val insetY = (size.height * .055f * amount).toInt()
-                        val srcLeft = ((x - bw / 2) * artwork.width).toInt().coerceIn(0, artwork.width - 1)
-                        val srcTop = ((y - bh / 2) * artwork.height).toInt().coerceIn(0, artwork.height - 1)
-                        val srcWidth = (bw * artwork.width).toInt().coerceIn(1, artwork.width - srcLeft)
-                        val srcHeight = (bh * artwork.height).toInt().coerceIn(1, artwork.height - srcTop)
-                        drawImage(
-                            artwork,
-                            srcOffset = androidx.compose.ui.unit.IntOffset(srcLeft, srcTop),
-                            srcSize = IntSize(srcWidth, srcHeight),
-                            dstOffset = androidx.compose.ui.unit.IntOffset(insetX, insetY * 2),
-                            dstSize = IntSize((size.width.toInt() - insetX * 2).coerceAtLeast(1), (size.height.toInt() - insetY * 2).coerceAtLeast(1)),
-                            alpha = amount,
-                        )
-                        drawRect(Color.Black.copy(alpha = amount * if (key.endsWith("fast") || latched) .24f else .12f))
-                        if (key.endsWith("fast") || latched) {
-                            val accent = Color(0xFF58D68D).copy(alpha = .96f * amount)
-                            drawRoundRect(
-                                color = accent,
-                                topLeft = Offset(insetX.toFloat(), insetY.toFloat()),
-                                size = androidx.compose.ui.geometry.Size(
-                                    (size.width - insetX * 2).coerceAtLeast(1f),
-                                    (size.height - insetY * 2).coerceAtLeast(1f),
-                                ),
-                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height * .35f),
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()),
-                            )
-                            drawCircle(
-                                color = accent,
-                                radius = size.minDimension * .075f,
-                                center = Offset(size.width * .84f, size.height * .16f),
-                            )
+                    isLandscapeStateAction -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                        if (amount > 0f) {
+                            val center = Offset(size.width * .5f, size.height * .42f + amount * 1.5.dp.toPx())
+                            val radius = size.minDimension * .34f
+                            drawCircle(Color.Black.copy(alpha = .32f * amount), radius, center)
+                            drawCircle(Color.White.copy(alpha = .22f * amount), radius * .72f, center, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
+                        }
+                    }
+                    isLandscapePrintedAction -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                        if (amount > 0f || (name == "fast" && latched)) {
+                            val center = Offset(size.width * .83f, size.height * .22f)
+                            val radius = size.minDimension * if (name == "fast") .085f else .24f
+                            if (name == "fast" && latched) {
+                                drawCircle(Color(0xFFFFB84D).copy(alpha = .25f), radius * 1.9f, center)
+                                drawCircle(Color(0xFFFFC15A), radius, center)
+                            } else drawCircle(Color.Black.copy(alpha = .20f * amount), radius, center)
+                        }
+                    }
+                    name in setOf("fps", "fast", "menu", "filters", "Start") -> {
+                        Column(
+                            Modifier.fillMaxSize().padding(vertical = 1.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(pillLabel, color = LabelColor, fontSize = if (panel == 0) 9.sp else 8.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Spacer(Modifier.height(2.dp))
+                            Box(
+                                Modifier.fillMaxWidth(.82f).weight(1f)
+                                    .graphicsLayer { scaleX = 1f - amount * .07f; scaleY = 1f - amount * .07f; translationY = amount * 1.5.dp.toPx() }
+                                    .clip(CircleShape)
+                                    .background(Brush.verticalGradient(listOf(pillTint.lighten(.22f), pillTint, pillTint.darken(if (down || (name == "fast" && latched)) .30f else .10f))))
+                                    .border(1.dp, Color.Black.copy(alpha = .34f), CircleShape),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) {
+                                if (name == "fast" && latched) {
+                                    Box(Modifier.padding(end = 5.dp).size(5.dp).background(Color(0xFFFFC15A), CircleShape))
+                                }
+                            }
+                        }
+                    }
+                    isStart -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                        if (amount > 0f) drawCircle(Color.White.copy(alpha = .25f * amount), size.minDimension * .16f)
+                    }
+                    else -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                        if (amount > 0f) {
+                            val nameIsFace = name in setOf("A", "B", "C", "X", "Y", "Z")
+                            val inset = size.minDimension * .07f * amount
+                            if (nameIsFace) {
+                                val radius = (size.minDimension * .5f - inset).coerceAtLeast(1f)
+                                val center = Offset(size.width * .5f, size.height * .5f + amount * 1.5.dp.toPx())
+                                drawCircle(Color.Black.copy(alpha = .4f * amount), radius, center)
+                                drawCircle(Color.White.copy(alpha = .2f * amount), radius * .9f, center, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
+                            } else {
+                                drawRoundRect(Color.Black.copy(alpha = .34f * amount), topLeft = Offset(inset, inset + amount * 1.5.dp.toPx()), size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .35f))
+                                drawRoundRect(Color.White.copy(alpha = .18f * amount), topLeft = Offset(inset, inset), size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .35f), style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
+                            }
                         }
                     }
                 }
@@ -262,7 +312,10 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         }
         @Composable fun directions(x: Float, y: Float, size: Float) {
             var active by remember { mutableStateOf(emptySet<TouchDirection>()) }
-            val glow by animateFloatAsState(if (active.isEmpty()) 0f else 1f, tween(100), label = "saturn-direction")
+            val up by animateFloatAsState(if (TouchDirection.UP in active) 1f else 0f, spring(.62f, 720f), label = "saturn-up")
+            val down by animateFloatAsState(if (TouchDirection.DOWN in active) 1f else 0f, spring(.62f, 720f), label = "saturn-down")
+            val left by animateFloatAsState(if (TouchDirection.LEFT in active) 1f else 0f, spring(.62f, 720f), label = "saturn-left")
+            val right by animateFloatAsState(if (TouchDirection.RIGHT in active) 1f else 0f, spring(.62f, 720f), label = "saturn-right")
             val dpadSize = if (panel == 0) w * (size / crop) else h * (size * sourceAspect)
             val dx = cx(x)
             Box(Modifier.offset(x = w * dx - dpadSize / 2, y = h * y - dpadSize / 2).size(dpadSize)) {
@@ -278,38 +331,64 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                 modifier = Modifier.fillMaxSize(),
                 track = Color.Transparent, normal = Color.Transparent, selected = Color.Transparent,
                 center = Color.Transparent, arrow = Color.Transparent, border = Color.Transparent)
-            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                if (glow > 0f) {
-                    // Animate only the selected direction. Repainting a rectangular crop of the textured panel
-                    // created visible seams around the circular D-pad and could distort its proportions.
-                    val tint = Color.White.copy(alpha = .34f * glow)
-                    val radius = this.size.minDimension * (.10f + .015f * glow)
-                    if (TouchDirection.UP in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .20f))
-                    if (TouchDirection.DOWN in active) drawCircle(tint, radius, Offset(this.size.width * .5f, this.size.height * .80f))
-                    if (TouchDirection.LEFT in active) drawCircle(tint, radius, Offset(this.size.width * .20f, this.size.height * .5f))
-                    if (TouchDirection.RIGHT in active) drawCircle(tint, radius, Offset(this.size.width * .80f, this.size.height * .5f))
-                }
-            }
+            DPadPressEffect(Modifier.fillMaxSize(), up, down, left, right)
             }
         }
         if (panel == 0) {
             saturn(.17f,.10f,.24f,.12f,SaturnButton.L); saturn(.83f,.10f,.24f,.12f,SaturnButton.R)
-            action(.36f,.13f,.19f,.06f,"load",a.onLoad); action(.64f,.13f,.19f,.06f,"save",a.onSave)
+            action(.17f,.23f,.15f,.11f,"load",a.onLoad); action(.50f,.23f,.17f,.09f,"menu",a.onMenu); action(.83f,.23f,.15f,.11f,"save",a.onSave)
             directions(.26f,.47f,.36f)
             saturn(.58f,.43f,.12f,.10f,SaturnButton.X); saturn(.70f,.38f,.12f,.10f,SaturnButton.Y); saturn(.83f,.35f,.12f,.10f,SaturnButton.Z)
             saturn(.60f,.55f,.13f,.10f,SaturnButton.A); saturn(.74f,.49f,.13f,.10f,SaturnButton.B); saturn(.88f,.46f,.13f,.10f,SaturnButton.C)
-            // The bottom row in the portrait artwork is centered at about 84% height, not 94%.
-            action(.28f,.84f,.16f,.09f,"fast",a.onFast,Emulator.fastForward); action(.50f,.84f,.16f,.09f,"menu",a.onMenu); saturn(.72f,.84f,.16f,.09f,SaturnButton.Start)
+            saturn(.50f,.70f,.17f,.09f,SaturnButton.Start)
+            action(.28f,.84f,.16f,.09f,"fps",a.onFps); action(.50f,.84f,.16f,.09f,"fast",a.onFast,Emulator.fastForward); action(.72f,.84f,.16f,.09f,"filters",a.onFilters)
         } else if (panel == 1) {
             saturn(.36f,.12f,.55f,.15f,SaturnButton.L); action(.80f,.15f,.20f,.13f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
-            action(.46f,.93f,.24f,.09f,"fast",a.onFast,Emulator.fastForward); saturn(.80f,.93f,.24f,.09f,SaturnButton.Start)
+            action(.27f,.92f,.22f,.11f,"fps",a.onFps); action(.48f,.93f,.22f,.09f,"fast",a.onFast,Emulator.fastForward); saturn(.80f,.93f,.24f,.09f,SaturnButton.Start)
         } else {
             saturn(.64f,.15f,.58f,.15f,SaturnButton.R); action(.21f,.15f,.20f,.13f,"save",a.onSave)
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
             saturn(.22f,.74f,.23f,.12f,SaturnButton.A); saturn(.46f,.67f,.23f,.12f,SaturnButton.B); saturn(.72f,.63f,.23f,.12f,SaturnButton.C)
             action(.21f,.92f,.28f,.09f,"filters",a.onFilters); action(.54f,.92f,.28f,.09f,"menu",a.onMenu)
         }
+    }
+}
+
+@Composable
+private fun DPadPressEffect(modifier: Modifier, up: Float, down: Float, left: Float, right: Float) {
+    androidx.compose.foundation.Canvas(modifier) {
+        val min = size.minDimension
+        val centerX = size.width * .5f
+        val centerY = size.height * .5f
+        val arm = min * .30f
+        val length = min * .34f
+        fun press(progress: Float, direction: TouchDirection) {
+            if (progress <= .01f) return
+            val travel = min * .035f * progress
+            val topLeft = when (direction) {
+                TouchDirection.UP -> Offset(centerX - arm / 2, centerY - length + travel)
+                TouchDirection.DOWN -> Offset(centerX - arm / 2, centerY + travel)
+                TouchDirection.LEFT -> Offset(centerX - length + travel, centerY - arm / 2)
+                TouchDirection.RIGHT -> Offset(centerX + travel, centerY - arm / 2)
+            }
+            val boxSize = if (direction == TouchDirection.UP || direction == TouchDirection.DOWN) {
+                androidx.compose.ui.geometry.Size(arm, length)
+            } else androidx.compose.ui.geometry.Size(length, arm)
+            val corner = androidx.compose.ui.geometry.CornerRadius(arm * .18f)
+            drawRoundRect(Color.Black.copy(alpha = .38f * progress), topLeft, boxSize, corner)
+            drawRoundRect(
+                Color.White.copy(alpha = .20f * progress),
+                topLeft = topLeft + Offset(1.dp.toPx(), -travel * .25f),
+                size = boxSize,
+                cornerRadius = corner,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
+            )
+        }
+        press(up, TouchDirection.UP)
+        press(down, TouchDirection.DOWN)
+        press(left, TouchDirection.LEFT)
+        press(right, TouchDirection.RIGHT)
     }
 }
 
@@ -334,11 +413,12 @@ private fun LegacyPortraitPad(modifier: Modifier, a: PadActions) {
                 Box(Modifier.align(Alignment.TopStart).offset(x = 16.dp, y = 34.dp)) { DPadRing() }
                 Box(Modifier.align(Alignment.TopEnd).offset(x = (-16).dp, y = 34.dp)) { FaceRing() }
                 Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Pill("FAST", GreyButton, a.onFast)
-                    Pill("MENU", GreyButton, a.onMenu)
-                    StartPill()
+                    Pill("FPS", GreyButton, a.onFps)
+                    Pill("FAST", GreyButton, a.onFast, Emulator.fastForward)
+                    Pill("FILTERS", GreyButton, a.onFilters)
                 }
             }
+            Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 72.dp)) { StartPill() }
         }
     }
 }
@@ -359,8 +439,9 @@ private fun LegacyLandscapePad(modifier: Modifier, ratio: Float, a: PadActions) 
                 Box(Modifier.align(Alignment.Center).size(200.dp, 340.dp).graphicsLayer { scaleX = s; scaleY = s }) {
                     Box(Modifier.align(Alignment.BottomCenter).offset(y = 22.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
                     Box(Modifier.align(Alignment.Center).offset(y = (-28).dp)) { DPadRing() }
-                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Pill("FAST", GreyButton, a.onFast)
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Pill("FPS", GreyButton, a.onFps)
+                        Pill("FAST", GreyButton, a.onFast, Emulator.fastForward)
                         StartPill()
                     }
                 }
@@ -422,10 +503,11 @@ private fun PortraitPad(modifier: Modifier, a: PadActions, layout: TouchControls
                 Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(if (compactSquare) 6.dp else 14.dp),
             ) {
-                Pill("FAST", GreyButton, a.onFast)
-                Pill("MENU", GreyButton, a.onMenu)
-                StartPill()
+                Pill("FPS", GreyButton, a.onFps)
+                Pill("FAST", GreyButton, a.onFast, Emulator.fastForward)
+                Pill("FILTERS", GreyButton, a.onFilters)
             }
+            Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 72.dp)) { StartPill() }
         }
         if (!compactSquare) {
             Row(
@@ -472,8 +554,9 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions, layout
                 Lobe("L", SaturnButton.L, left = true, Modifier.align(Alignment.TopStart).padding(top = 68.dp))
                 Box(Modifier.align(Alignment.BottomCenter)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
                 Box(Modifier.align(Alignment.Center).offset(y = (-28).dp)) { DPadRing() }
-                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Pill("FAST", GreyButton, a.onFast)
+                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill("FPS", GreyButton, a.onFps)
+                    Pill("FAST", GreyButton, a.onFast, Emulator.fastForward)
                     StartPill()
                 }
             }
@@ -574,11 +657,11 @@ private fun Lobe(label: String, b: SaturnButton, left: Boolean, modifier: Modifi
 private fun StartPill() = LabeledPill("START", Crimson, "start") { down -> TouchState.set("start", if (down) SaturnButton.Start.bit else 0) }
 
 @Composable
-private fun Pill(label: String, tint: Color, onClick: () -> Unit) =
-    LabeledPill(label, tint, "pill-$label") { down -> if (down) onClick() }
+private fun Pill(label: String, tint: Color, onClick: () -> Unit, latched: Boolean = false) =
+    LabeledPill(label, tint, "pill-$label", latched) { down -> if (down) onClick() }
 
 @Composable
-private fun LabeledPill(label: String, tint: Color, key: String, onPressed: (Boolean) -> Unit) {
+private fun LabeledPill(label: String, tint: Color, key: String, latched: Boolean = false, onPressed: (Boolean) -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, color = LabelColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
@@ -586,9 +669,13 @@ private fun LabeledPill(label: String, tint: Color, key: String, onPressed: (Boo
         PressArea(key, onPressed, Modifier.size(width = 58.dp, height = 24.dp)) { pressed ->
             Box(
                 Modifier.fillMaxSize()
-                    .background(Brush.verticalGradient(listOf(tint.lighten(.2f), tint.darken(if (pressed) .25f else 0f))), shape)
+                    .graphicsLayer { scaleX = if (pressed || latched) .94f else 1f; scaleY = if (pressed || latched) .90f else 1f; translationY = if (pressed || latched) 1.dp.toPx() else 0f }
+                    .background(Brush.verticalGradient(listOf(tint.lighten(.2f), tint.darken(if (pressed || latched) .25f else 0f))), shape)
                     .border(1.dp, Color.Black.copy(alpha = .2f), shape),
-            )
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                if (latched) Box(Modifier.padding(end = 6.dp).size(5.dp).background(Color(0xFFFFC15A), CircleShape))
+            }
         }
     }
 }
@@ -635,6 +722,10 @@ private fun Color.darken(f: Float) = Color(red * (1f - f), green * (1f - f), blu
 @Composable
 private fun DPad() {
     var active by remember { mutableStateOf(emptySet<TouchDirection>()) }
+    val up by animateFloatAsState(if (TouchDirection.UP in active) 1f else 0f, spring(.62f, 720f), label = "dpad-up")
+    val down by animateFloatAsState(if (TouchDirection.DOWN in active) 1f else 0f, spring(.62f, 720f), label = "dpad-down")
+    val left by animateFloatAsState(if (TouchDirection.LEFT in active) 1f else 0f, spring(.62f, 720f), label = "dpad-left")
+    val right by animateFloatAsState(if (TouchDirection.RIGHT in active) 1f else 0f, spring(.62f, 720f), label = "dpad-right")
     Box(Modifier.size(164.dp), contentAlignment = Alignment.Center) {
     // Keep GBFrame's established 8-way hit testing, ownership and haptics; replace only its visual surface.
     TouchDPad(
@@ -661,20 +752,7 @@ private fun DPad() {
         contentScale = ContentScale.Fit,
         modifier = Modifier.fillMaxSize(),
     )
-    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-        val half = size.minDimension * .5f
-        val center = Offset(size.width * .5f, size.height * .5f)
-        val radius = size.minDimension * .055f
-        val highlight = Color.White.copy(alpha = .30f)
-        if (TouchDirection.UP in active && TouchDirection.LEFT in active) drawCircle(highlight, radius, Offset(center.x - half * .46f, center.y - half * .46f))
-        if (TouchDirection.UP in active) drawCircle(highlight, radius, Offset(center.x, center.y - half * .68f))
-        if (TouchDirection.UP in active && TouchDirection.RIGHT in active) drawCircle(highlight, radius, Offset(center.x + half * .46f, center.y - half * .46f))
-        if (TouchDirection.LEFT in active) drawCircle(highlight, radius, Offset(center.x - half * .68f, center.y))
-        if (TouchDirection.RIGHT in active) drawCircle(highlight, radius, Offset(center.x + half * .68f, center.y))
-        if (TouchDirection.DOWN in active && TouchDirection.LEFT in active) drawCircle(highlight, radius, Offset(center.x - half * .46f, center.y + half * .46f))
-        if (TouchDirection.DOWN in active) drawCircle(highlight, radius, Offset(center.x, center.y + half * .68f))
-        if (TouchDirection.DOWN in active && TouchDirection.RIGHT in active) drawCircle(highlight, radius, Offset(center.x + half * .46f, center.y + half * .46f))
-    }
+    DPadPressEffect(Modifier.fillMaxSize(), up, down, left, right)
     }
 }
 
