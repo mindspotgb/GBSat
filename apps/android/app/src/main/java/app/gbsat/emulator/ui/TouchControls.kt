@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -39,6 +40,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gbsat.emulator.Emulator
@@ -48,6 +50,7 @@ import app.gbsat.emulator.R
 import gb.frame.MechanicalArtworkPress
 import gb.frame.MechanicalArtworkDPad
 import gb.frame.MechanicalArtworkSlideToggle
+import gb.frame.MechanicalArtworkToggleSpec
 import gb.frame.TouchDPad
 import gb.frame.TouchControlsLayoutMetrics
 import gb.frame.TouchControlsOverlay
@@ -87,6 +90,22 @@ private class PadActions(
     val onFilters: () -> Unit,
     val onMenu: () -> Unit,
     val onFps: () -> Unit,
+)
+
+// Measured in source pixels of saturn_touch_landscape_left.webp, so the thumb follows the real printed switch.
+private val fpsLandscapeToggle = MechanicalArtworkToggleSpec(
+    track = IntRect(70, 1466, 316, 1596),
+    thumbOffCenter = Offset(131f, 1532f),
+    thumbOnCenter = Offset(253f, 1532f),
+    blankSampleCenter = Offset(233f, 1532f),
+    thumbRadius = 49f,
+)
+private val fastLandscapeToggle = MechanicalArtworkToggleSpec(
+    track = IntRect(365, 1466, 613, 1596),
+    thumbOffCenter = Offset(426f, 1532f),
+    thumbOnCenter = Offset(552f, 1532f),
+    blankSampleCenter = Offset(528f, 1532f),
+    thumbRadius = 49f,
 )
 
 /**
@@ -284,7 +303,16 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                     if (panel == 0) {
                         ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress, true)
                     } else {
+                        val sourceArea = Rect(
+                            (x - bw / 2f) * artwork.width,
+                            (y - bh / 2f) * artwork.height,
+                            (x + bw / 2f) * artwork.width,
+                            (y + bh / 2f) * artwork.height,
+                        )
                         MechanicalArtworkSlideToggle(
+                            artwork = artwork,
+                            spec = if (name == "fps") fpsLandscapeToggle else fastLandscapeToggle,
+                            sourceArea = sourceArea,
                             isOn = latched,
                             isPressed = down,
                             modifier = Modifier.fillMaxSize(),
@@ -342,7 +370,9 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         } else if (panel == 1) {
             saturn(.36f,.12f,.55f,.15f,SaturnButton.L); action(.80f,.15f,.20f,.13f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
-            action(.27f,.92f,.22f,.11f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed); action(.48f,.93f,.22f,.09f,"fast",a.onFast,Emulator.fastForward); saturn(.80f,.93f,.24f,.09f,SaturnButton.Start)
+            action(.202f,.93f,.275f,.10f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed)
+            action(.512f,.93f,.275f,.10f,"fast",a.onFast,Emulator.fastForward)
+            saturn(.81f,.93f,.24f,.09f,SaturnButton.Start)
         } else {
             saturn(.64f,.15f,.58f,.15f,SaturnButton.R); action(.21f,.15f,.20f,.13f,"save",a.onSave)
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
@@ -794,13 +824,23 @@ private fun Pill(label: String, tint: Color, onClick: () -> Unit, latched: Boole
 
 @Composable
 private fun MechanicalTogglePill(label: String, isOn: Boolean, onClick: () -> Unit) {
+    val artwork = ImageBitmap.imageResource(R.drawable.saturn_touch_landscape_left)
+    val spec = if (label == "FPS") fpsLandscapeToggle else fastLandscapeToggle
+    val sourceArea = Rect(
+        spec.track.left.toFloat(), spec.track.top.toFloat(),
+        spec.track.right.toFloat(), spec.track.bottom.toFloat(),
+    )
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, color = LabelColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(3.dp))
-        PressArea("mechanical-toggle-$label", { down -> if (down) onClick() }, Modifier.size(58.dp, 24.dp)) { pressed ->
+        PressArea("mechanical-toggle-$label", { down -> if (down) onClick() }, Modifier.size(58.dp, 30.dp)) { pressed ->
             MechanicalArtworkSlideToggle(
+                artwork = artwork,
+                spec = spec,
+                sourceArea = sourceArea,
                 isOn = isOn,
                 isPressed = pressed,
+                drawTrack = true,
                 modifier = Modifier.fillMaxSize(),
             )
         }
