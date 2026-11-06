@@ -47,6 +47,7 @@ import app.gbsat.emulator.SaturnButton
 import app.gbsat.emulator.R
 import gb.frame.MechanicalArtworkPress
 import gb.frame.MechanicalArtworkDPad
+import gb.frame.MechanicalArtworkSlideToggle
 import gb.frame.TouchDPad
 import gb.frame.TouchControlsLayoutMetrics
 import gb.frame.TouchControlsOverlay
@@ -279,10 +280,18 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                     tween(durationMillis = 180),
                     label = "$key-latched",
                 )
-                if (name != "fps" && name != "fast") {
-                    MechanicalArtworkPress(artwork, x, y, bw, bh, name, amount)
+                if (name == "fps" || name == "fast") {
+                    if (panel == 0) {
+                        ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress, true)
+                    } else {
+                        MechanicalArtworkSlideToggle(
+                            isOn = latched,
+                            isPressed = down,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 } else {
-                    ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress, true)
+                    MechanicalArtworkPress(artwork, x, y, bw, bh, name, amount)
                 }
             }
         }
