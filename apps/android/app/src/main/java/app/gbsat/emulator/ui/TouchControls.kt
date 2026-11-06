@@ -93,24 +93,25 @@ private class PadActions(
 )
 
 // Measured in source pixels of saturn_touch_landscape_left.webp, so the thumb follows the real printed switch.
-// Pill knobs (the same slide switches as the portrait controller) printed at the off position.
-private val fpsLandscapeToggle = MechanicalArtworkToggleSpec(
-    track = IntRect(69, 1480, 315, 1587),
-    thumbOffCenter = Offset(179.5f, 1540f),
-    thumbOnCenter = Offset(206.4f, 1540f),
-    blankSampleCenter = Offset(278f, 1540f),
-    thumbRadius = 37f,
-    thumbHalfWidth = 87.5f,
-    blankStripX = 278f,
-)
+// Pill knobs (the same slide switches as the portrait controller) printed at the off position, at the top of each
+// panel: FAST above LOAD in saturn_touch_landscape_left, FPS above SAVE in saturn_touch_landscape_right.
 private val fastLandscapeToggle = MechanicalArtworkToggleSpec(
-    track = IntRect(364, 1480, 610, 1587),
-    thumbOffCenter = Offset(474.5f, 1540f),
-    thumbOnCenter = Offset(501.4f, 1540f),
-    blankSampleCenter = Offset(573f, 1540f),
-    thumbRadius = 37f,
-    thumbHalfWidth = 87.5f,
-    blankStripX = 573f,
+    track = IntRect(655, 77, 865, 169),
+    thumbOffCenter = Offset(749f, 127.5f),
+    thumbOnCenter = Offset(771.9f, 127.5f),
+    blankSampleCenter = Offset(834f, 127.5f),
+    thumbRadius = 31.5f,
+    thumbHalfWidth = 75f,
+    blankStripX = 834f,
+)
+private val fpsLandscapeToggle = MechanicalArtworkToggleSpec(
+    track = IntRect(96, 77, 306, 169),
+    thumbOffCenter = Offset(190f, 127.5f),
+    thumbOnCenter = Offset(212.9f, 127.5f),
+    blankSampleCenter = Offset(275f, 127.5f),
+    thumbRadius = 31.5f,
+    thumbHalfWidth = 75f,
+    blankStripX = 275f,
 )
 
 /**
@@ -361,7 +362,12 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                 centerY = y,
                 sourceSizeFraction = size * diskScale,
                 activeDirections = active,
-                modifier = Modifier.align(Alignment.Center).size(dpadSize * diskScale),
+                // The landscape art is drawn a little narrower than tall (crop vs height), so the moving disk takes
+                // the art's own x and y scales; a square disk came out wider than the printed one when pressed.
+                modifier = Modifier.align(Alignment.Center).then(
+                    if (panel == 0) Modifier.size(dpadSize * diskScale)
+                    else Modifier.size(w * (size * diskScale / crop), h * (size * diskScale * sourceAspect))
+                ),
             )
             }
         }
@@ -377,16 +383,17 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
             action(.74f,.81f,.20f,.085f,"fast",a.onFast,Emulator.fastForward)
         } else if (panel == 1) {
             // L/R boxes are the cap bounds of the shoulder sprites (saturn_land_l/r), so the moving cap matches the art
-            saturn(.3586f,.1208f,.422f,.1518f,SaturnButton.L); action(.80f,.15f,.20f,.13f,"load",a.onLoad)
+            saturn(.3586f,.1208f,.422f,.1518f,SaturnButton.L)
+            action(.7958f,.058f,.22f,.089f,"fast",a.onFast,Emulator.fastForward)
+            action(.796f,.19f,.20f,.15f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
-            action(.202f,.93f,.275f,.10f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed)
-            action(.512f,.93f,.275f,.10f,"fast",a.onFast,Emulator.fastForward)
-            saturn(.81f,.93f,.24f,.09f,SaturnButton.Start)
+            saturn(.5513f,.927f,.24f,.09f,SaturnButton.Start) // centred under the D-pad
         } else {
-            saturn(.6426f,.1252f,.4194f,.1527f,SaturnButton.R); action(.21f,.15f,.20f,.13f,"save",a.onSave)
+            saturn(.6426f,.1252f,.4194f,.1527f,SaturnButton.R); action(.21f,.19f,.20f,.15f,"save",a.onSave)
+            action(.2092f,.0583f,.2185f,.0898f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed)
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
             saturn(.22f,.74f,.23f,.12f,SaturnButton.A); saturn(.46f,.67f,.23f,.12f,SaturnButton.B); saturn(.72f,.63f,.23f,.12f,SaturnButton.C)
-            action(.21f,.92f,.28f,.09f,"filters",a.onFilters); action(.54f,.92f,.28f,.09f,"menu",a.onMenu)
+            action(.2966f,.927f,.28f,.09f,"filters",a.onFilters); action(.6311f,.927f,.28f,.09f,"menu",a.onMenu) // centred under B
         }
     }
 }
@@ -846,7 +853,9 @@ private fun Pill(label: String, tint: Color, onClick: () -> Unit, latched: Boole
 
 @Composable
 private fun MechanicalTogglePill(label: String, isOn: Boolean, onClick: () -> Unit) {
-    val artwork = ImageBitmap.imageResource(R.drawable.saturn_touch_landscape_left)
+    val artwork = ImageBitmap.imageResource(
+        if (label == "FPS") R.drawable.saturn_touch_landscape_right else R.drawable.saturn_touch_landscape_left,
+    )
     val spec = if (label == "FPS") fpsLandscapeToggle else fastLandscapeToggle
     val sourceArea = Rect(
         spec.track.left.toFloat(), spec.track.top.toFloat(),
