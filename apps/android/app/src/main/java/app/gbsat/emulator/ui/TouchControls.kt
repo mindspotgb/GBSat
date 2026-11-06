@@ -175,17 +175,20 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
         // game, so a swipe that shows it never covers the pad); the spare height above it shows the logo.
         val navBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
         val usable = (maxHeight - navBar).coerceAtLeast(0.dp)
-        // A band for the logo is kept between the game and the controller (the controller shrinks a little for it)
-        val logoBand = if (usable > 300.dp) 40.dp else 0.dp
+        // The logo uses the spare height plus the artwork's transparent top margin (39 of its 1415 rows, above the
+        // body). Only a thin band is taken from the controller (about 3%), so it still fills the screen width.
+        val logoBand = if (usable > 300.dp) 16.dp else 0.dp
         val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, usable - logoBand)
         val gap = (usable - artSize.height).coerceAtLeast(0.dp)
-        if (gap >= 20.dp) {
+        val space = gap + artSize.height * (39f / 1415f)
+        if (space >= 24.dp) {
+            val logoHeight = space * .84f
             Image(
                 painter = painterResource(R.drawable.saturn_logo_banner),
                 contentDescription = "Sega Saturn",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = gap * .18f)
-                    .height(gap * .64f).widthIn(max = maxWidth * .72f),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = space - logoHeight - 2.dp)
+                    .height(logoHeight).widthIn(max = maxWidth * .86f),
             )
         }
         SaturnControllerV12(
