@@ -25,7 +25,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onSizeChanged
@@ -194,13 +193,15 @@ fun LibraryScreen(
                 menuOpen = !menuOpen
             }, menuOpen = menuOpen)
             Box(Modifier.fillMaxWidth().weight(1f)) {
-                // Official SEGA Saturn logo watermark (Wikimedia Commons, File: SEGA Saturn logo.png).
+                // SEGA Saturn logo watermark supplied for the library background.
                 Image(
                     painter = painterResource(R.drawable.sega_saturn_logo_watermark),
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    colorFilter = ColorFilter.tint(Color(0xFF8798D0)),
-                    modifier = Modifier.align(Alignment.Center).fillMaxWidth(.72f).alpha(.12f),
+                    modifier = Modifier.align(Alignment.Center)
+                        .fillMaxWidth(.48f)
+                        .fillMaxHeight(.72f)
+                        .alpha(.18f),
                 )
                 HomeLibrary(style, homeGames, entries, actions, coverVersion, empty,
                     refocus = MenuState.refocus.intValue, fullscreen = fullscreen,
