@@ -46,6 +46,7 @@ import app.gbsat.emulator.NativeBridge
 import app.gbsat.emulator.SaturnButton
 import app.gbsat.emulator.R
 import gb.frame.MechanicalArtworkPress
+import gb.frame.MechanicalArtworkDPad
 import gb.frame.TouchDPad
 import gb.frame.TouchControlsLayoutMetrics
 import gb.frame.TouchControlsOverlay
@@ -279,8 +280,7 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                     label = "$key-latched",
                 )
                 if (name != "fps" && name != "fast") {
-                    if (panel != 0) ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, 0f, true)
-                    else MechanicalArtworkPress(artwork, x, y, bw, bh, name, amount)
+                    MechanicalArtworkPress(artwork, x, y, bw, bh, name, amount)
                 } else {
                     ControllerArtworkPressEffect(Modifier.fillMaxSize(), name, amount, latchedProgress, true)
                 }
@@ -294,10 +294,6 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         }
         @Composable fun directions(x: Float, y: Float, size: Float) {
             var active by remember { mutableStateOf(emptySet<TouchDirection>()) }
-            val up by animateFloatAsState(if (TouchDirection.UP in active) 1f else 0f, spring(.62f, 720f), label = "saturn-up")
-            val down by animateFloatAsState(if (TouchDirection.DOWN in active) 1f else 0f, spring(.62f, 720f), label = "saturn-down")
-            val left by animateFloatAsState(if (TouchDirection.LEFT in active) 1f else 0f, spring(.62f, 720f), label = "saturn-left")
-            val right by animateFloatAsState(if (TouchDirection.RIGHT in active) 1f else 0f, spring(.62f, 720f), label = "saturn-right")
             val dpadSize = if (panel == 0) w * (size / crop) else h * (size * sourceAspect)
             val dx = cx(x)
             Box(Modifier.offset(x = w * dx - dpadSize / 2, y = h * y - dpadSize / 2).size(dpadSize)) {
@@ -313,23 +309,15 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                 modifier = Modifier.fillMaxSize(),
                 track = Color.Transparent, normal = Color.Transparent, selected = Color.Transparent,
                 center = Color.Transparent, arrow = Color.Transparent, border = Color.Transparent)
-            if (panel == 0 && maxOf(up, down, left, right) > .001f) {
-                val sourceSize = (size * artwork.width).toInt().coerceAtLeast(1)
-                val sourceLeft = (x * artwork.width - sourceSize / 2f).toInt().coerceIn(0, artwork.width - sourceSize)
-                val sourceTop = (y * artwork.height - sourceSize / 2f).toInt().coerceIn(0, artwork.height - sourceSize)
-                Canvas(Modifier.fillMaxSize().graphicsLayer {
-                    rotationX = (down - up) * 4f
-                    rotationY = (left - right) * 4f
-                    cameraDistance = 12f * density
-                }.clip(CircleShape)) {
-                    drawImage(artwork, srcOffset = androidx.compose.ui.unit.IntOffset(sourceLeft, sourceTop),
-                        srcSize = IntSize(sourceSize, sourceSize),
-                        dstSize = IntSize(this.size.width.toInt().coerceAtLeast(1), this.size.height.toInt().coerceAtLeast(1)))
-                    drawCircle(Color.Black.copy(alpha = .07f * maxOf(up, down, left, right)))
-                }
-            } else if (panel != 0) {
-                DPadPressEffect(Modifier.fillMaxSize(), up, down, left, right)
-            }
+            val diskScale = .71f
+            MechanicalArtworkDPad(
+                artwork = artwork,
+                centerX = x,
+                centerY = y,
+                sourceSizeFraction = size * diskScale,
+                activeDirections = active,
+                modifier = Modifier.align(Alignment.Center).size(dpadSize * diskScale),
+            )
             }
         }
         if (panel == 0) {
