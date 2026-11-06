@@ -96,19 +96,19 @@ private class PadActions(
 // Pill knobs (the same slide switches as the portrait controller) printed at the off position, at the top of each
 // panel: FAST above LOAD in saturn_touch_landscape_left, FPS above SAVE in saturn_touch_landscape_right.
 private val fastLandscapeToggle = MechanicalArtworkToggleSpec(
-    track = IntRect(655, 77, 865, 169),
-    thumbOffCenter = Offset(749f, 127.5f),
-    thumbOnCenter = Offset(771.9f, 127.5f),
-    blankSampleCenter = Offset(834f, 127.5f),
+    track = IntRect(655, 70, 865, 162),
+    thumbOffCenter = Offset(749f, 120.5f),
+    thumbOnCenter = Offset(771.9f, 120.5f),
+    blankSampleCenter = Offset(834f, 120.5f),
     thumbRadius = 31.5f,
     thumbHalfWidth = 75f,
     blankStripX = 834f,
 )
 private val fpsLandscapeToggle = MechanicalArtworkToggleSpec(
-    track = IntRect(96, 77, 306, 169),
-    thumbOffCenter = Offset(190f, 127.5f),
-    thumbOnCenter = Offset(212.9f, 127.5f),
-    blankSampleCenter = Offset(275f, 127.5f),
+    track = IntRect(96, 70, 306, 162),
+    thumbOffCenter = Offset(190f, 120.5f),
+    thumbOnCenter = Offset(212.9f, 120.5f),
+    blankSampleCenter = Offset(275f, 120.5f),
     thumbRadius = 31.5f,
     thumbHalfWidth = 75f,
     blankStripX = 275f,
@@ -168,12 +168,28 @@ fun TouchControls(
 
 /** Artwork uses normalized hit regions so the same input positions follow the scaled image. */
 @Composable
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
     BoxWithConstraints(modifier) {
-        val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, maxHeight)
+        // The controller's bottom stops at the navigation bar's edge (its height even while the bar is hidden in a
+        // game, so a swipe that shows it never covers the pad); the spare height above it shows the logo.
+        val navBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
+        val usable = (maxHeight - navBar).coerceAtLeast(0.dp)
+        // A band for the logo is kept between the game and the controller (the controller shrinks a little for it)
+        val logoBand = if (usable > 300.dp) 40.dp else 0.dp
+        val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, usable - logoBand)
+        val gap = (usable - artSize.height).coerceAtLeast(0.dp)
+        if (gap >= 20.dp) {
+            Image(
+                painter = painterResource(R.drawable.saturn_logo_banner),
+                contentDescription = "Sega Saturn",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = gap * .18f)
+                    .height(gap * .64f).widthIn(max = maxWidth * .72f),
+            )
+        }
         SaturnControllerV12(
-            // Centered: when the controller is width-limited the spare height splits above and below it.
-            modifier = Modifier.align(Alignment.Center).requiredSize(artSize),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBar).requiredSize(artSize),
             fpsEnabled = Emulator.showFps && Emulator.showSpeed,
             fastEnabled = Emulator.fastForward,
             hapticsEnabled = Emulator.touchHapticsEnabled,
@@ -384,13 +400,13 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         } else if (panel == 1) {
             // L/R boxes are the cap bounds of the shoulder sprites (saturn_land_l/r), so the moving cap matches the art
             saturn(.3586f,.1208f,.422f,.1518f,SaturnButton.L)
-            action(.7958f,.058f,.22f,.089f,"fast",a.onFast,Emulator.fastForward)
+            action(.7958f,.0559f,.22f,.085f,"fast",a.onFast,Emulator.fastForward)
             action(.796f,.19f,.20f,.15f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
             saturn(.5513f,.927f,.24f,.09f,SaturnButton.Start) // centred under the D-pad
         } else {
             saturn(.6426f,.1252f,.4194f,.1527f,SaturnButton.R); action(.21f,.19f,.20f,.15f,"save",a.onSave)
-            action(.2092f,.0583f,.2185f,.0898f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed)
+            action(.2092f,.0562f,.2185f,.0855f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed)
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
             saturn(.22f,.74f,.23f,.12f,SaturnButton.A); saturn(.46f,.67f,.23f,.12f,SaturnButton.B); saturn(.72f,.63f,.23f,.12f,SaturnButton.C)
             action(.2966f,.927f,.28f,.09f,"filters",a.onFilters); action(.6311f,.927f,.28f,.09f,"menu",a.onMenu) // centred under B
