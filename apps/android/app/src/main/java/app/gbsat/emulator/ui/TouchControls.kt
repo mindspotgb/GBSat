@@ -168,33 +168,18 @@ fun TouchControls(
 
 /** Artwork uses normalized hit regions so the same input positions follow the scaled image. */
 @Composable
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
-    BoxWithConstraints(modifier) {
-        // The controller's body ends at the navigation bar's edge (its height even while the bar is hidden in a game,
-        // so a swipe that shows it never covers the pad). saturn_base.png has transparent margins: 36 rows above the
-        // body and 45 below it (of 1415), which are not counted as space.
-        val navBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
-        val gapTop = 10.dp    // game screen -> logo
-        val gapMid = 10.dp    // logo -> controller body
-        val minLogo = if (maxHeight > 300.dp) 26.dp else 0.dp
-        val bodyBudget = (maxHeight - navBar - gapTop - minLogo - gapMid).coerceAtLeast(0.dp)
-        val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, bodyBudget * (1415f / 1334f))
-        val bottomMargin = artSize.height * (45f / 1415f)
-        val bodyTop = maxHeight - navBar - artSize.height * (1334f / 1415f)
-        val logoHeight = (bodyTop - gapMid - gapTop).coerceIn(0.dp, 36.dp)
-        if (minLogo > 0.dp && logoHeight >= 18.dp) {
-            Image(
-                painter = painterResource(R.drawable.saturn_logo_banner),
-                contentDescription = "Sega Saturn",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth()
-                    .padding(top = bodyTop - gapMid - logoHeight).height(logoHeight),
-            )
-        }
+    // GBFrame places it: body ends at the navigation bar, the Saturn logo sits between the game and the pad
+    gb.frame.PortraitControllerLayout(
+        modifier = modifier,
+        artworkSize = ::saturnControllerV12PortraitArtworkSize,
+        marginTop = gb.frame.SATURN_V12_MARGIN_TOP,
+        marginBottom = gb.frame.SATURN_V12_MARGIN_BOTTOM,
+        logo = painterResource(R.drawable.saturn_logo_banner),
+        logoDescription = "Sega Saturn",
+    ) { placement ->
         SaturnControllerV12(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBar).offset(y = bottomMargin)
-                .requiredSize(artSize),
+            modifier = placement,
             fpsEnabled = Emulator.showFps && Emulator.showSpeed,
             fastEnabled = Emulator.fastForward,
             hapticsEnabled = Emulator.touchHapticsEnabled,
@@ -251,7 +236,16 @@ private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions)
     BoxWithConstraints(modifier) {
         val side = ((maxWidth - maxHeight * ratio) / 2).coerceAtLeast(0.dp)
         if (Emulator.aspect == 1 || side < 100.dp) {
-            LegacyLandscapePad(Modifier.fillMaxSize(), ratio, a)
+            // Full screen (or no room beside the picture): the same printed controls float over the game. The
+            // overlay artworks keep only the controls and their labels (the body is transparent), drawn at the art's
+            // own proportions and slightly see-through.
+            val panelW = maxHeight * .49f
+            Box(Modifier.align(Alignment.CenterStart).width(panelW).fillMaxHeight().graphicsLayer { alpha = OverlayAlpha }) {
+                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_touch_landscape_left_overlay, 1, a, overlay = true)
+            }
+            Box(Modifier.align(Alignment.CenterEnd).width(panelW).fillMaxHeight().graphicsLayer { alpha = OverlayAlpha }) {
+                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_touch_landscape_right_overlay, 2, a, overlay = true)
+            }
         } else {
             val edgeFill = Brush.verticalGradient(listOf(Color(0xFF292B31), Color(0xFF22242A), Color(0xFF292B31)))
             Box(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight().background(edgeFill)) {
@@ -264,8 +258,10 @@ private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions)
     }
 }
 
+private const val OverlayAlpha = .85f
+
 @Composable
-private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions) {
+private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions, overlay: Boolean = false) {
     BoxWithConstraints(modifier) {
         val w = maxWidth
         val h = maxHeight
@@ -285,7 +281,7 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
         }.coerceIn(0f, 1f - crop)
         fun cx(x: Float) = ((x - cropStart) / crop).coerceIn(0f, 1f)
         fun cw(size: Float) = (size / crop).coerceIn(.04f, 1f)
-        Canvas(Modifier.fillMaxSize().then(if (panel == 0) Modifier else Modifier.background(Color(0xFF15161A)))) {
+        Canvas(Modifier.fillMaxSize().then(if (panel == 0 || overlay) Modifier else Modifier.background(Color(0xFF15161A)))) {
             val sourceLeft = (cropStart * artwork.width).toInt().coerceIn(0, artwork.width - 1)
             val sourceWidth = (crop * artwork.width).toInt().coerceIn(1, artwork.width - sourceLeft)
             drawImage(
