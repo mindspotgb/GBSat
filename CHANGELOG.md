@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Redesigned touch controller: flat L/R shoulders, FAST/FPS slide switches, SAVE/LOAD beside the logo, START between MENU and FILTERS, and a darker Saturn-black body in portrait and landscape.
+- Touch buttons line up with their artwork (the touch areas were slightly offset) and press mechanically, with no digital glow.
+- Portrait phones use the whole screen in game; the controller ends at the navigation bar with the Sega Saturn logo above it.
+- Full-screen landscape shows the same controls over the game, slightly see-through.
+- Crash reports name the thread that crashed.
 
 ## 1.0
 - First standalone Android release. Includes the Saturn core, Vulkan and OpenGL ES rendering, GBFrame library and menus, game profiles, cheats, save states, and RetroAchievements.
