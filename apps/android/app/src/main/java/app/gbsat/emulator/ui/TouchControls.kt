@@ -56,10 +56,6 @@ import gb.frame.TouchControlsLayoutMetrics
 import gb.frame.TouchControlsOverlay
 import gb.frame.TouchControlsPlacement
 import gb.frame.TouchDirection
-import gb.frame.SaturnControllerV12
-import gb.frame.saturnControllerV12PortraitArtworkSize
-import gb.frame.SaturnButton as KitSaturnButton
-import gb.frame.SaturnDirection as KitSaturnDirection
 import kotlinx.coroutines.launch
 import kotlin.math.hypot
 
@@ -173,8 +169,8 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
     gb.frame.PortraitControllerLayout(
         modifier = modifier,
         artworkSize = ::saturnControllerV12PortraitArtworkSize,
-        marginTop = gb.frame.SATURN_V12_MARGIN_TOP,
-        marginBottom = gb.frame.SATURN_V12_MARGIN_BOTTOM,
+        marginTop = SATURN_V12_MARGIN_TOP,
+        marginBottom = SATURN_V12_MARGIN_BOTTOM,
         logo = painterResource(R.drawable.saturn_logo_banner),
         logoDescription = "Sega Saturn",
     ) { placement ->
@@ -185,39 +181,39 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
             hapticsEnabled = Emulator.touchHapticsEnabled,
             onButton = { button, down ->
                 val coreButton = when (button) {
-                    KitSaturnButton.L -> SaturnButton.L
-                    KitSaturnButton.R -> SaturnButton.R
-                    KitSaturnButton.X -> SaturnButton.X
-                    KitSaturnButton.Y -> SaturnButton.Y
-                    KitSaturnButton.Z -> SaturnButton.Z
-                    KitSaturnButton.A -> SaturnButton.A
-                    KitSaturnButton.B -> SaturnButton.B
-                    KitSaturnButton.C -> SaturnButton.C
-                    KitSaturnButton.START -> SaturnButton.Start
+                    PadSaturnButton.L -> SaturnButton.L
+                    PadSaturnButton.R -> SaturnButton.R
+                    PadSaturnButton.X -> SaturnButton.X
+                    PadSaturnButton.Y -> SaturnButton.Y
+                    PadSaturnButton.Z -> SaturnButton.Z
+                    PadSaturnButton.A -> SaturnButton.A
+                    PadSaturnButton.B -> SaturnButton.B
+                    PadSaturnButton.C -> SaturnButton.C
+                    PadSaturnButton.START -> SaturnButton.Start
                     else -> null
                 }
                 if (coreButton != null) {
                     TouchState.set(coreButton, if (down) coreButton.bit else 0)
                 } else if (down) {
                     when (button) {
-                        KitSaturnButton.MENU -> a.onMenu()
-                        KitSaturnButton.SAVE -> a.onSave()
-                        KitSaturnButton.LOAD -> a.onLoad()
-                        KitSaturnButton.FILTERS -> a.onFilters()
+                        PadSaturnButton.MENU -> a.onMenu()
+                        PadSaturnButton.SAVE -> a.onSave()
+                        PadSaturnButton.LOAD -> a.onLoad()
+                        PadSaturnButton.FILTERS -> a.onFilters()
                         else -> Unit
                     }
                 }
             },
             onDirection = { direction, down ->
                 val bits = if (!down) 0 else when (direction) {
-                    KitSaturnDirection.UP -> SaturnButton.Up.bit
-                    KitSaturnDirection.UP_RIGHT -> SaturnButton.Up.bit or SaturnButton.Right.bit
-                    KitSaturnDirection.RIGHT -> SaturnButton.Right.bit
-                    KitSaturnDirection.DOWN_RIGHT -> SaturnButton.Down.bit or SaturnButton.Right.bit
-                    KitSaturnDirection.DOWN -> SaturnButton.Down.bit
-                    KitSaturnDirection.DOWN_LEFT -> SaturnButton.Down.bit or SaturnButton.Left.bit
-                    KitSaturnDirection.LEFT -> SaturnButton.Left.bit
-                    KitSaturnDirection.UP_LEFT -> SaturnButton.Up.bit or SaturnButton.Left.bit
+                    PadSaturnDirection.UP -> SaturnButton.Up.bit
+                    PadSaturnDirection.UP_RIGHT -> SaturnButton.Up.bit or SaturnButton.Right.bit
+                    PadSaturnDirection.RIGHT -> SaturnButton.Right.bit
+                    PadSaturnDirection.DOWN_RIGHT -> SaturnButton.Down.bit or SaturnButton.Right.bit
+                    PadSaturnDirection.DOWN -> SaturnButton.Down.bit
+                    PadSaturnDirection.DOWN_LEFT -> SaturnButton.Down.bit or SaturnButton.Left.bit
+                    PadSaturnDirection.LEFT -> SaturnButton.Left.bit
+                    PadSaturnDirection.UP_LEFT -> SaturnButton.Up.bit or SaturnButton.Left.bit
                 }
                 TouchState.set("saturn-v12-dpad", bits)
             },
