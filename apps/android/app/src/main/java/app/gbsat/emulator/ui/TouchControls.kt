@@ -93,19 +93,24 @@ private class PadActions(
 )
 
 // Measured in source pixels of saturn_touch_landscape_left.webp, so the thumb follows the real printed switch.
+// Pill knobs (the same slide switches as the portrait controller) printed at the off position.
 private val fpsLandscapeToggle = MechanicalArtworkToggleSpec(
-    track = IntRect(70, 1466, 316, 1596),
-    thumbOffCenter = Offset(131f, 1532f),
-    thumbOnCenter = Offset(253f, 1532f),
-    blankSampleCenter = Offset(233f, 1532f),
-    thumbRadius = 49f,
+    track = IntRect(69, 1480, 315, 1587),
+    thumbOffCenter = Offset(179.5f, 1540f),
+    thumbOnCenter = Offset(206.4f, 1540f),
+    blankSampleCenter = Offset(278f, 1540f),
+    thumbRadius = 37f,
+    thumbHalfWidth = 87.5f,
+    blankStripX = 278f,
 )
 private val fastLandscapeToggle = MechanicalArtworkToggleSpec(
-    track = IntRect(365, 1466, 613, 1596),
-    thumbOffCenter = Offset(426f, 1532f),
-    thumbOnCenter = Offset(552f, 1532f),
-    blankSampleCenter = Offset(528f, 1532f),
-    thumbRadius = 49f,
+    track = IntRect(364, 1480, 610, 1587),
+    thumbOffCenter = Offset(474.5f, 1540f),
+    thumbOnCenter = Offset(501.4f, 1540f),
+    blankSampleCenter = Offset(573f, 1540f),
+    thumbRadius = 37f,
+    thumbHalfWidth = 87.5f,
+    blankStripX = 573f,
 )
 
 /**
@@ -319,6 +324,8 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
+                } else if (panel != 0 && (name == "L" || name == "R")) {
+                    ShoulderPress(if (name == "L") R.drawable.saturn_land_l else R.drawable.saturn_land_r, amount)
                 } else {
                     MechanicalArtworkPress(artwork, x, y, bw, bh, name, amount)
                 }
@@ -369,17 +376,31 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
             action(.50f,.81f,.19f,.085f,"filters",a.onFilters)
             action(.74f,.81f,.20f,.085f,"fast",a.onFast,Emulator.fastForward)
         } else if (panel == 1) {
-            saturn(.36f,.12f,.55f,.15f,SaturnButton.L); action(.80f,.15f,.20f,.13f,"load",a.onLoad)
+            // L/R boxes are the cap bounds of the shoulder sprites (saturn_land_l/r), so the moving cap matches the art
+            saturn(.3586f,.1208f,.422f,.1518f,SaturnButton.L); action(.80f,.15f,.20f,.13f,"load",a.onLoad)
             directions(.55f,.63f,.65f)
             action(.202f,.93f,.275f,.10f,"fps",a.onFps,Emulator.showFps && Emulator.showSpeed)
             action(.512f,.93f,.275f,.10f,"fast",a.onFast,Emulator.fastForward)
             saturn(.81f,.93f,.24f,.09f,SaturnButton.Start)
         } else {
-            saturn(.64f,.15f,.58f,.15f,SaturnButton.R); action(.21f,.15f,.20f,.13f,"save",a.onSave)
+            saturn(.6426f,.1252f,.4194f,.1527f,SaturnButton.R); action(.21f,.15f,.20f,.13f,"save",a.onSave)
             saturn(.17f,.59f,.21f,.12f,SaturnButton.X); saturn(.39f,.52f,.21f,.12f,SaturnButton.Y); saturn(.63f,.48f,.21f,.12f,SaturnButton.Z)
             saturn(.22f,.74f,.23f,.12f,SaturnButton.A); saturn(.46f,.67f,.23f,.12f,SaturnButton.B); saturn(.72f,.63f,.23f,.12f,SaturnButton.C)
             action(.21f,.92f,.28f,.09f,"filters",a.onFilters); action(.54f,.92f,.28f,.09f,"menu",a.onMenu)
         }
+    }
+}
+
+/** Shoulder button: the cut-out cap moves down over a dark copy of its own outline, with no rectangular edge. */
+@Composable
+private fun ShoulderPress(sprite: Int, amount: Float) {
+    if (amount <= .001f) return
+    val painter = painterResource(sprite)
+    Box(Modifier.fillMaxSize()) {
+        Image(painter, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds,
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black), alpha = .62f * amount)
+        Image(painter, null, Modifier.fillMaxSize().graphicsLayer { translationY = 2.dp.toPx() * amount },
+            contentScale = ContentScale.FillBounds)
     }
 }
 
