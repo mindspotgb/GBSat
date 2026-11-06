@@ -8,9 +8,10 @@ val gbsatBuild = (providers.gradleProperty("gbsatVersionCode").orNull
 }
 
 // Signing (GBFrame CONVENTIONS.md "Signing"): the permanent key comes from GBSAT_KEYSTORE_FILE/GBSAT_KEYSTORE_PASSWORD
-// (CI) or from gbsat.keystore.file/gbsat.keystore.passwordFile in local.properties (owner's PC), and signs debug and
-// release alike. Debug builds are always the side-by-side "GBSat Dev" (app.gbsat.emulator.dev). Without the key every
-// APK is "GBSat Dev" signed with the debug key, so a differently signed APK can never claim the official application ID.
+// (CI) or from gbsat.keystore.file/gbsat.keystore.passwordFile in local.properties (owner's PC), and signs release.
+// Debug builds are always the side-by-side "GBSat Dev" (app.gbsat.emulator.dev) signed with the Android debug key.
+// Without the permanent key every APK is "GBSat Dev" signed with the debug key, so a differently signed APK can never
+// claim the official application ID.
 val gbsatLocalProperties = Properties().apply {
     rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
 }
@@ -102,10 +103,10 @@ android {
     buildTypes {
         debug {
             // Debug is the owner's test build: always the side-by-side "GBSat Dev" (app.gbsat.emulator.dev), signed
-            // with the same permanent key as release (keyless builds already get the suffix from defaultConfig).
+            // with the Android debug key, never the permanent one (keyless builds already get the suffix from defaultConfig).
             if (gbsatKey != null) applicationIdSuffix = ".dev"
             manifestPlaceholders["appLabel"] = "GBSat Dev"
-            signingConfig = signingConfigs.getByName("sideload")
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = true
