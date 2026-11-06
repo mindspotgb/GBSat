@@ -175,8 +175,8 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
         // so a swipe that shows it never covers the pad). saturn_base.png has transparent margins: 36 rows above the
         // body and 45 below it (of 1415), which are not counted as space.
         val navBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
-        val gapTop = 6.dp     // game screen -> logo
-        val gapMid = 6.dp     // logo -> controller body
+        val gapTop = 10.dp    // game screen -> logo
+        val gapMid = 10.dp    // logo -> controller body
         val minLogo = if (maxHeight > 300.dp) 26.dp else 0.dp
         val bodyBudget = (maxHeight - navBar - gapTop - minLogo - gapMid).coerceAtLeast(0.dp)
         val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, bodyBudget * (1415f / 1334f))
