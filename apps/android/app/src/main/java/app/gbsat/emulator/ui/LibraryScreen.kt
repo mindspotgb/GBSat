@@ -4,6 +4,7 @@ import gb.frame.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,15 +18,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
@@ -190,6 +194,14 @@ fun LibraryScreen(
                 menuOpen = !menuOpen
             }, menuOpen = menuOpen)
             Box(Modifier.fillMaxWidth().weight(1f)) {
+                // Official SEGA Saturn logo watermark (Wikimedia Commons, File: SEGA Saturn logo.png).
+                Image(
+                    painter = painterResource(R.drawable.sega_saturn_logo_watermark),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(Color(0xFF8798D0)),
+                    modifier = Modifier.align(Alignment.Center).fillMaxWidth(.72f).alpha(.12f),
+                )
                 HomeLibrary(style, homeGames, entries, actions, coverVersion, empty,
                     refocus = MenuState.refocus.intValue, fullscreen = fullscreen,
                     // The open menu owns the controller; when it closes the library takes the focus back on the last selected game
