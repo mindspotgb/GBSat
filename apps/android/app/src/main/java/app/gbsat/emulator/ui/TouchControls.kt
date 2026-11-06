@@ -171,28 +171,30 @@ fun TouchControls(
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
     BoxWithConstraints(modifier) {
-        // The controller's bottom stops at the navigation bar's edge (its height even while the bar is hidden in a
-        // game, so a swipe that shows it never covers the pad); the spare height above it shows the logo.
+        // The controller's body ends at the navigation bar's edge (its height even while the bar is hidden in a game,
+        // so a swipe that shows it never covers the pad). saturn_base.png has transparent margins: 36 rows above the
+        // body and 45 below it (of 1415), which are not counted as space.
         val navBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
-        val usable = (maxHeight - navBar).coerceAtLeast(0.dp)
-        // The logo uses the spare height plus the artwork's transparent top margin (39 of its 1415 rows, above the
-        // body). Only a thin band is taken from the controller (about 3%), so it still fills the screen width.
-        val logoBand = if (usable > 300.dp) 16.dp else 0.dp
-        val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, usable - logoBand)
-        val gap = (usable - artSize.height).coerceAtLeast(0.dp)
-        val space = gap + artSize.height * (39f / 1415f)
-        if (space >= 24.dp) {
-            val logoHeight = space * .84f
+        val gapTop = 6.dp     // game screen -> logo
+        val gapMid = 6.dp     // logo -> controller body
+        val minLogo = if (maxHeight > 300.dp) 26.dp else 0.dp
+        val bodyBudget = (maxHeight - navBar - gapTop - minLogo - gapMid).coerceAtLeast(0.dp)
+        val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, bodyBudget * (1415f / 1334f))
+        val bottomMargin = artSize.height * (45f / 1415f)
+        val bodyTop = maxHeight - navBar - artSize.height * (1334f / 1415f)
+        val logoHeight = (bodyTop - gapMid - gapTop).coerceIn(0.dp, 36.dp)
+        if (minLogo > 0.dp && logoHeight >= 18.dp) {
             Image(
                 painter = painterResource(R.drawable.saturn_logo_banner),
                 contentDescription = "Sega Saturn",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = space - logoHeight - 2.dp)
-                    .height(logoHeight).widthIn(max = maxWidth * .86f),
+                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth()
+                    .padding(top = bodyTop - gapMid - logoHeight).height(logoHeight),
             )
         }
         SaturnControllerV12(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBar).requiredSize(artSize),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBar).offset(y = bottomMargin)
+                .requiredSize(artSize),
             fpsEnabled = Emulator.showFps && Emulator.showSpeed,
             fastEnabled = Emulator.fastForward,
             hapticsEnabled = Emulator.touchHapticsEnabled,
