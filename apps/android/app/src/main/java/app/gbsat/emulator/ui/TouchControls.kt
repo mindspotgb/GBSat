@@ -572,8 +572,8 @@ private fun LegacyLandscapePad(modifier: Modifier, ratio: Float, a: PadActions) 
                     Box(Modifier.align(Alignment.BottomCenter).offset(y = 22.dp)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
                     Box(Modifier.align(Alignment.Center).offset(y = (-28).dp)) { DPadRing() }
                     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Pill("FPS", GreyButton, a.onFps)
-                        Pill("FAST", GreyButton, a.onFast, Emulator.fastForward)
+                        MechanicalTogglePill("FPS", Emulator.showFps && Emulator.showSpeed, a.onFps)
+                        MechanicalTogglePill("FAST", Emulator.fastForward, a.onFast)
                         StartPill()
                     }
                 }
@@ -687,8 +687,8 @@ private fun LandscapePad(modifier: Modifier, ratio: Float, a: PadActions, layout
                 Box(Modifier.align(Alignment.BottomCenter)) { StateAction("LOAD", Icons.Default.Refresh, a.onLoad) }
                 Box(Modifier.align(Alignment.Center).offset(y = (-28).dp)) { DPadRing() }
                 Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Pill("FPS", GreyButton, a.onFps)
-                    Pill("FAST", GreyButton, a.onFast, Emulator.fastForward)
+                    MechanicalTogglePill("FPS", Emulator.showFps && Emulator.showSpeed, a.onFps)
+                    MechanicalTogglePill("FAST", Emulator.fastForward, a.onFast)
                     StartPill()
                 }
             }
@@ -791,6 +791,21 @@ private fun StartPill() = LabeledPill("START", Crimson, "start") { down -> Touch
 @Composable
 private fun Pill(label: String, tint: Color, onClick: () -> Unit, latched: Boolean = false) =
     LabeledPill(label, tint, "pill-$label", latched) { down -> if (down) onClick() }
+
+@Composable
+private fun MechanicalTogglePill(label: String, isOn: Boolean, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = LabelColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(3.dp))
+        PressArea("mechanical-toggle-$label", { down -> if (down) onClick() }, Modifier.size(58.dp, 24.dp)) { pressed ->
+            MechanicalArtworkSlideToggle(
+                isOn = isOn,
+                isPressed = pressed,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
 
 @Composable
 private fun LabeledPill(label: String, tint: Color, key: String, latched: Boolean = false, onPressed: (Boolean) -> Unit) {
