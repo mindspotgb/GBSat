@@ -120,7 +120,8 @@ fun GameScreen(onQuitApp: () -> Unit) {
                 onMenu = { menu = true; Emulator.pause(true) }, videoRatio = ratio,
             )
         } else if (!kitTouchLayout) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+            // Phones in portrait: the game runs immersive, so use the whole screen (no status/navigation bar gaps)
+            Column(Modifier.fillMaxSize()) {
                 if (touch) {
                     Box(Modifier.fillMaxWidth().aspectRatio(ratio), contentAlignment = Alignment.TopCenter) {
                         VideoSurface(Modifier.fillMaxSize())

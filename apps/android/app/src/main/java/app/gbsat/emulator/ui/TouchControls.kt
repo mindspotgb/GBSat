@@ -166,7 +166,8 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
     BoxWithConstraints(modifier) {
         val artSize = saturnControllerV12PortraitArtworkSize(maxWidth, maxHeight)
         SaturnControllerV12(
-            modifier = Modifier.align(Alignment.TopCenter).requiredSize(artSize),
+            // Centered: when the controller is width-limited the spare height splits above and below it.
+            modifier = Modifier.align(Alignment.Center).requiredSize(artSize),
             fpsEnabled = Emulator.showFps && Emulator.showSpeed,
             fastEnabled = Emulator.fastForward,
             hapticsEnabled = Emulator.touchHapticsEnabled,
