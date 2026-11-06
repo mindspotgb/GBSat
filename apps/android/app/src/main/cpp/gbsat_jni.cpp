@@ -7,6 +7,7 @@
 
 #include <aaudio/AAudio.h>
 #include <dlfcn.h>
+#include <sys/prctl.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
@@ -352,6 +353,13 @@ void CrashHandler(int sig, siginfo_t *info, void *) {
         WriteDec(fd, g_crashRenderer.load());
         WriteStr(fd, "\nstage=");
         WriteStr(fd, g_stage);
+        {
+            // Which thread crashed (the UI's RenderThread, the presenter, the emulator...): frames alone rarely say
+            char name[17] = {};
+            prctl(PR_GET_NAME, name, 0, 0, 0);
+            WriteStr(fd, "\nthread=");
+            WriteStr(fd, name);
+        }
         WriteStr(fd, "\nbacktrace:\n");
         BacktraceState st;
         _Unwind_Backtrace(UnwindCb, &st);
