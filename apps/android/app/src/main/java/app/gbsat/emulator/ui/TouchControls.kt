@@ -381,7 +381,7 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
                         if (Emulator.analogPad) Emulator.setTouchStick(((v.x + 1f) * 127.5f).toInt().coerceIn(0, 255),
                             ((v.y + 1f) * 127.5f).toInt().coerceIn(0, 255))
                     },
-                    // Waits at the static D-pad's place until the first touch
+                    // Rests at the static D-pad's place whenever it is not held
                     restCenter = with(androidx.compose.ui.platform.LocalDensity.current) {
                         Offset((w * cx(x)).toPx(), (h * (y - .30f)).toPx())
                     },

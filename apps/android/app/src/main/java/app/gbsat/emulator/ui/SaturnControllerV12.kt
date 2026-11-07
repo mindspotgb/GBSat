@@ -213,7 +213,6 @@ fun SaturnControllerV12(
     val stick = remember { gb.frame.FloatingStick(FLOAT_RADIUS) }
     var floatCenter by remember { mutableStateOf<Offset?>(null) }
     var floatKnob by remember { mutableStateOf(Offset.Zero) }
-    var floatTouched by remember { mutableStateOf(false) }
     val currentOnStick by rememberUpdatedState(onStick)
     val down = remember { mutableStateMapOf<PadSaturnButton, Boolean>() }
     var direction by remember { mutableStateOf<PadSaturnDirection?>(null) }
@@ -268,7 +267,7 @@ fun SaturnControllerV12(
                                     hitTest(p, dynamicDpad)?.let {
                                         // One floating stick: a second finger on its side does not move it
                                         if (it.target == InputTarget.FLOAT && stick.active) return@let
-                                        if (it.target == InputTarget.FLOAT) { stick.down(p); floatTouched = true }
+                                        if (it.target == InputTarget.FLOAT) stick.down(p)
                                         held[change.id] = it
                                         change.consume()
                                         if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -348,10 +347,9 @@ fun SaturnControllerV12(
         val padX by animateFloatAsState(if (direction != null) dx * 319f * .0115f * widthPx / DESIGN_W else 0f, tween(85), label = "dpad x")
         val padY by animateFloatAsState(if (direction != null) (1.5f + dy * .75f) / 100f * 331f * heightPx / DESIGN_H else 0f, tween(85), label = "dpad y")
         if (dynamicDpad) {
-            // Floating arcade stick. Before the first touch it waits at the D-pad's place so the player sees it;
-            // afterwards it is drawn only while held: the base where the touch started (following the thumb past
-            // the radius) and the ball top moved by the knob.
-            (floatCenter ?: Offset(DPAD_CENTER_X, DPAD_CENTER_Y).takeIf { !floatTouched })?.let { c ->
+            // Floating arcade stick: at rest in the D-pad's place; while held, the base sits where the touch started
+            // (following the thumb past the radius) with the ball top moved by the knob; on release it goes back.
+            (floatCenter ?: Offset(DPAD_CENTER_X, DPAD_CENTER_Y)).let { c ->
                 ArcadeStick(
                     Modifier.offset(x = sx * (c.x - DPAD_W / 2), y = sy * (c.y - DPAD_H / 2)).size(sx * DPAD_W, sy * DPAD_H),
                     knob = androidx.compose.ui.unit.DpOffset(sx * floatKnob.x, sy * floatKnob.y),
