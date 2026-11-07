@@ -56,6 +56,8 @@ object Emulator {
     var scspMode by mutableStateOf(0)        // threaded audio: 0 = Auto (per game, tuned while playing), 1 = On, 2 = Off
     var touchControlsMode by mutableStateOf(TouchControlsMode.AUTO)
     var touchHapticsEnabled by mutableStateOf(true)
+    /** Static D-pad in the artwork, or the floating one that appears under the thumb. */
+    var touchDpadMode by mutableStateOf(gb.frame.TouchDpadMode.STATIC)
     var aspect by mutableStateOf(0) // 0 = 4:3, 1 = fill, 2 = 16:9
     /** Apply built-in Saturn widescreen codes when a matching game runs in 16:9. */
     var widescreenGameHacks by mutableStateOf(gb.frame.GameHackPolicy.WIDESCREEN_DEFAULT_ENABLED)
@@ -479,6 +481,8 @@ object Emulator {
         }
         if (storedTouchMode == "SHOW") prefs.edit().putString("touchControlsMode", TouchControlsMode.ON.name).apply()
         touchHapticsEnabled = prefs.getBoolean("touchHapticsEnabled", true)
+        touchDpadMode = runCatching { gb.frame.TouchDpadMode.valueOf(prefs.getString("touchDpadMode", null) ?: "STATIC") }
+            .getOrDefault(gb.frame.TouchDpadMode.STATIC)
         aspect = prefs.getInt("aspect", 0).coerceIn(0, 2)
         widescreenGameHacks = prefs.getBoolean("widescreenGameHacks", gb.frame.GameHackPolicy.WIDESCREEN_DEFAULT_ENABLED)
         showFps = prefs.getBoolean("showFps", false)
@@ -586,12 +590,15 @@ object Emulator {
     private fun savePrefsEditor(globals: GameOpts?) = prefs.edit()
         .putString("gamesDir", gamesDir).putBoolean("analogPad", analogPad).putBoolean("sh2Cache", sh2Cache).putInt("sh2Sync", cpuSync).putBoolean("cpuRecompiler", sh2Recompiler)
         .putInt("scspMode", globals?.scspMode ?: scspMode).putBoolean("gameProfiles", useGameProfiles)
-        .putString("touchControlsMode", touchControlsMode.name).putBoolean("touchHapticsEnabled", touchHapticsEnabled).remove("touch").putInt("aspect", aspect).putBoolean("widescreenGameHacks", widescreenGameHacks).putBoolean("showFps", showFps).putBoolean("showSpeed", showSpeed).putBoolean("showFfButton", showFfButton).putBoolean("showRenderer", showRenderer).putBoolean("showResolution", showResolution).putBoolean("showCpu", showCpu).putBoolean("showGpu", showGpu).putBoolean("showFrameTime", showFrameTime)
+        .putString("touchControlsMode", touchControlsMode.name).putBoolean("touchHapticsEnabled", touchHapticsEnabled).putString("touchDpadMode", touchDpadMode.name).remove("touch").putInt("aspect", aspect).putBoolean("widescreenGameHacks", widescreenGameHacks).putBoolean("showFps", showFps).putBoolean("showSpeed", showSpeed).putBoolean("showFfButton", showFfButton).putBoolean("showRenderer", showRenderer).putBoolean("showResolution", showResolution).putBoolean("showCpu", showCpu).putBoolean("showGpu", showGpu).putBoolean("showFrameTime", showFrameTime)
         .putBoolean("fastBoot", fastBoot).putInt("renderer", globals?.renderer ?: renderer).putInt("filter", filter).putInt("shader", shader).putInt("resScale", resScale).putInt("cdSpeed", cdSpeed).putBoolean("skipLoads", skipLoads).putBoolean("skipTransitions", skipTransitions).putBoolean("skipSaves", skipSaves).putBoolean("frameSkip", globals?.frameSkip ?: frameSkip).putInt("volume", volume).putBoolean("autoSave", autoSave).putBoolean("autoLoad", autoLoad).putInt("ffAudio", ffAudio)
         .putBoolean("ffToggle", ffToggle)
 
     /** Validate a staged BIOS in the active data folder before replacing the installed one. */
     suspend fun importBios(context: Context, uri: android.net.Uri): String? = withContext(Dispatchers.IO) {
+        // Only .bin files are BIOS images (the picker cannot filter by extension, so check the name here)
+        val name = androidx.documentfile.provider.DocumentFile.fromSingleUri(context, uri)?.name
+        if (!gb.frame.BiosFiles.isBiosFileName(name)) return@withContext gb.frame.BiosFiles.notBinMessage
         val destination = biosFile
         destination.parentFile?.mkdirs()
         val staged = File.createTempFile("bios-", ".tmp", destination.parentFile)

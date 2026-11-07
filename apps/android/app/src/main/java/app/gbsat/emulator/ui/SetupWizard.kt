@@ -50,7 +50,7 @@ fun SetupWizard(onFinish: () -> Unit) {
             gb.frame.dataFolderWizardStep(Emulator.dataFolder, chooseDataFolder),
             WizardStep(Icons.Default.Memory, "Saturn BIOS", listOf(Color(0xFFFFB347), Color(0xFFFF6B6B)),
                 "GBSat needs your own Saturn BIOS (IPL ROM, 512 KiB). None is included.") {
-                Button(onClick = { biosPicker.launch(arrayOf("*/*")) }) { gb.frame.KitText(if (Emulator.iplLoaded) "Replace BIOS" else "Choose BIOS file") }
+                Button(onClick = { biosPicker.launch(gb.frame.BiosFiles.pickerMimeTypes) }) { gb.frame.KitText(if (Emulator.iplLoaded) "Replace BIOS" else "Choose BIOS file") }
                 if (Emulator.iplLoaded) WizardStatus("BIOS loaded")
             },
             gb.frame.gamesFolderWizardStep(

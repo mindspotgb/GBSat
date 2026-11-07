@@ -329,12 +329,10 @@ private fun GameMenu(onDismiss: () -> Unit) {
     val overlaysPage = remember {
         QuickMenuPage("overlays", "Overlays") {
             MonitoringQuickMenuRows(GBSatMonitoring)
-            TouchControlsQuickMenuItem(id = "touch_controls", value = Emulator.touchControlsMode) {
-                Emulator.touchControlsMode = it
-                Emulator.savePrefs()
-            }
         }
     }
+    // The kit's Controls page: touch controls, directional pad (static/dynamic) and haptics
+    val controlsPage = remember { gb.frame.controlsQuickMenuPage(SaturnControls) }
     val cheatsPage = remember {
         QuickMenuPage("cheats", "Cheats", fullScreen = true) {
             gb.frame.CheatsScreen(backend = GBSatCheatsBackend, onBack = { back() })
@@ -437,6 +435,7 @@ private fun GameMenu(onDismiss: () -> Unit) {
             QuickMenuItemRow(
                 id = "overlays", icon = Icons.Default.Layers, label = "Overlays", hasSubmenu = true,
             ) { openPage(overlaysPage, returnFocusItemId = "overlays") }
+            ControlsQuickMenuEntry(controlsPage)
             QuickMenuItemRow(
                 id = "game", icon = Icons.Default.SportsEsports, label = "Game", hasSubmenu = true,
             ) { openPage(gamePage, returnFocusItemId = "game") }

@@ -127,16 +127,35 @@ private fun capMask(c: ControlRect, cap: Cap, round: Boolean) = GenericShape { s
     }
 }
 
-private enum class InputTarget { BUTTON, DPAD, FPS, FAST }
+private enum class InputTarget { BUTTON, DPAD, FLOAT, FPS, FAST }
+
+/** Dynamic D-pad: where a touch can start the floating stick (left side, below SAVE/SEGA, above the bottom row). */
+private val floatZone = androidx.compose.ui.geometry.Rect(36f, 395f, 548f, 1075f)
+/** Floating stick travel, in design px; the knob (the directional disk, shrunk) moves at most this far. */
+private const val FLOAT_RADIUS = 95f
+private const val FLOAT_KNOB_SCALE = .62f
+
+private fun Set<gb.frame.TouchDirection>.toPadDirection(): PadSaturnDirection? {
+    val u = gb.frame.TouchDirection.UP in this; val d = gb.frame.TouchDirection.DOWN in this
+    val l = gb.frame.TouchDirection.LEFT in this; val r = gb.frame.TouchDirection.RIGHT in this
+    return when {
+        u && r -> PadSaturnDirection.UP_RIGHT; u && l -> PadSaturnDirection.UP_LEFT
+        d && r -> PadSaturnDirection.DOWN_RIGHT; d && l -> PadSaturnDirection.DOWN_LEFT
+        u -> PadSaturnDirection.UP; d -> PadSaturnDirection.DOWN
+        l -> PadSaturnDirection.LEFT; r -> PadSaturnDirection.RIGHT
+        else -> null
+    }
+}
 private data class Press(val target: InputTarget, val button: PadSaturnButton? = null, val direction: PadSaturnDirection? = null)
 
-private fun hitTest(p: Offset): Press? {
+private fun hitTest(p: Offset, dynamicDpad: Boolean = false): Press? {
     // FAST/FPS switches: the track and its printed label.
     if (fpsSwitch.hit.contains(p)) return Press(InputTarget.FPS)
     if (fastSwitch.hit.contains(p)) return Press(InputTarget.FAST)
-    if (insideDpad(p)) return Press(InputTarget.DPAD, direction = dpadDirection(p))
+    if (!dynamicDpad && insideDpad(p)) return Press(InputTarget.DPAD, direction = dpadDirection(p))
     // Buttons are evaluated from the foreground back to avoid overlap errors.
-    return controls.asReversed().firstOrNull { it.contains(p) }?.let { Press(InputTarget.BUTTON, button = it.button) }
+    controls.asReversed().firstOrNull { it.contains(p) }?.let { return Press(InputTarget.BUTTON, button = it.button) }
+    return if (dynamicDpad && floatZone.contains(p)) Press(InputTarget.FLOAT) else null
 }
 
 /** Circular hit area matches the directional disk, inside the larger visible bezel. */
@@ -185,8 +204,17 @@ fun SaturnControllerV12(
     onButton: (PadSaturnButton, Boolean) -> Unit,
     onDirection: (PadSaturnDirection, Boolean) -> Unit,
     onFpsChange: (Boolean) -> Unit,
-    onFastChange: (Boolean) -> Unit
+    onFastChange: (Boolean) -> Unit,
+    /** Dynamic D-pad: hidden until a touch on its side, where it appears and follows the thumb (TouchDpadMode). */
+    dynamicDpad: Boolean = false,
+    /** Floating stick vector (each axis -1..1, (0, 0) on release), for an analog pad. */
+    onStick: ((Float, Float) -> Unit)? = null,
 ) {
+    val stick = remember { gb.frame.FloatingStick(FLOAT_RADIUS) }
+    var floatCenter by remember { mutableStateOf<Offset?>(null) }
+    var floatKnob by remember { mutableStateOf(Offset.Zero) }
+    var floatTouched by remember { mutableStateOf(false) }
+    val currentOnStick by rememberUpdatedState(onStick)
     val down = remember { mutableStateMapOf<PadSaturnButton, Boolean>() }
     var direction by remember { mutableStateOf<PadSaturnDirection?>(null) }
     val currentOnButton by rememberUpdatedState(onButton)
@@ -199,7 +227,7 @@ fun SaturnControllerV12(
 
     BoxWithConstraints(
         modifier = modifier.aspectRatio(DESIGN_W / DESIGN_H)
-            .pointerInput(hapticsEnabled) {
+            .pointerInput(hapticsEnabled, dynamicDpad) {
                 // Pointer-id ownership ensures simultaneous buttons, diagonals and L/R work.
                 awaitEachGesture {
                     // Read the size on every gesture: the pointer coroutine outlives resizes (system bars hiding after
@@ -216,7 +244,12 @@ fun SaturnControllerV12(
                                 currentOnButton(button, now)
                             }
                         }
-                        val newDir = held.values.firstOrNull { it.target == InputTarget.DPAD }?.direction
+                        val newDir = held.values.firstOrNull { it.target == InputTarget.DPAD || it.target == InputTarget.FLOAT }?.direction
+                        if (floatCenter != stick.center || floatKnob != stick.knob) {
+                            floatCenter = stick.center
+                            floatKnob = stick.knob
+                            currentOnStick?.invoke(stick.vector.x, stick.vector.y)
+                        }
                         if (newDir != direction) {
                             direction?.let { currentOnDirection(it, false) }
                             direction = newDir
@@ -232,14 +265,18 @@ fun SaturnControllerV12(
                             event.changes.forEach { change ->
                                 val p = Offset(change.position.x / scaleX, change.position.y / scaleY)
                                 if (change.changedToDown()) {
-                                    hitTest(p)?.let {
+                                    hitTest(p, dynamicDpad)?.let {
+                                        // One floating stick: a second finger on its side does not move it
+                                        if (it.target == InputTarget.FLOAT && stick.active) return@let
+                                        if (it.target == InputTarget.FLOAT) { stick.down(p); floatTouched = true }
                                         held[change.id] = it
                                         change.consume()
                                         if (hapticsEnabled) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     }
                                 } else if (change.changedToUp()) {
                                     val original = held.remove(change.id)
-                                    val released = hitTest(p)
+                                    if (original?.target == InputTarget.FLOAT) stick.up()
+                                    val released = hitTest(p, dynamicDpad)
                                     when (original?.target) {
                                         InputTarget.FPS -> if (released?.target == InputTarget.FPS) currentOnFpsChange(!currentFps)
                                         InputTarget.FAST -> if (released?.target == InputTarget.FAST) currentOnFastChange(!currentFast)
@@ -251,6 +288,10 @@ fun SaturnControllerV12(
                                     if (old?.target == InputTarget.DPAD) {
                                         held[change.id] = old.copy(direction = dpadDirection(p))
                                         change.consume()
+                                    } else if (old?.target == InputTarget.FLOAT) {
+                                        stick.move(p)
+                                        held[change.id] = old.copy(direction = gb.frame.stickDirections(stick.vector).toPadDirection())
+                                        change.consume()
                                     } else if (old != null) {
                                         change.consume()
                                     }
@@ -260,6 +301,7 @@ fun SaturnControllerV12(
                         } while (event.changes.any { it.pressed })
                     } finally {
                         held.clear()
+                        stick.up()
                         reconcile()
                     }
                 }
@@ -305,6 +347,17 @@ fun SaturnControllerV12(
         val dpadPressed by animateFloatAsState(if (direction == null) 0f else 1f, tween(85), label = "dpad press")
         val padX by animateFloatAsState(if (direction != null) dx * 319f * .0115f * widthPx / DESIGN_W else 0f, tween(85), label = "dpad x")
         val padY by animateFloatAsState(if (direction != null) (1.5f + dy * .75f) / 100f * 331f * heightPx / DESIGN_H else 0f, tween(85), label = "dpad y")
+        if (dynamicDpad) {
+            // Floating arcade stick. Before the first touch it waits at the D-pad's place so the player sees it;
+            // afterwards it is drawn only while held: the base where the touch started (following the thumb past
+            // the radius) and the ball top moved by the knob.
+            (floatCenter ?: Offset(DPAD_CENTER_X, DPAD_CENTER_Y).takeIf { !floatTouched })?.let { c ->
+                ArcadeStick(
+                    Modifier.offset(x = sx * (c.x - DPAD_W / 2), y = sy * (c.y - DPAD_H / 2)).size(sx * DPAD_W, sy * DPAD_H),
+                    knob = androidx.compose.ui.unit.DpOffset(sx * floatKnob.x, sy * floatKnob.y),
+                )
+            }
+        } else {
         // Keep the supplied outer bezel stationary; only the directional disk below moves on press.
         Image(
             painter = painterResource(R.drawable.gb_saturn_v12_dpad_bezel), contentDescription = null,
@@ -325,6 +378,7 @@ fun SaturnControllerV12(
                 },
             contentScale = ContentScale.Fit
         )
+        }
 
         // The base image has both tracks empty; each knob slides inside its own.
         val fpsTravel by animateFloatAsState(if (fpsEnabled) SWITCH_TRAVEL else 0f, tween(140), label = "fps toggle")
@@ -339,5 +393,32 @@ fun SaturnControllerV12(
                     .size(sx * switch.w, sy * switch.h), contentScale = ContentScale.FillBounds
             )
         }
+    }
+}
+
+/**
+ * Arcade stick drawn from the Saturn art: the D-pad bezel as the base, a dust cover, the shaft and a crimson ball top
+ * moved by [knob] from the centre of [modifier]'s box (the base size).
+ */
+@Composable
+internal fun ArcadeStick(modifier: Modifier, knob: androidx.compose.ui.unit.DpOffset) {
+    BoxWithConstraints(modifier) {
+        val s = maxWidth
+        Image(painterResource(R.drawable.gb_saturn_v12_dpad_bezel), null, Modifier.size(maxWidth, maxHeight), contentScale = ContentScale.Fit)
+        val cover = s * .44f
+        Image(painterResource(R.drawable.saturn_stick_cover), null,
+            Modifier.offset(x = (maxWidth - cover) / 2, y = (maxHeight - cover) / 2).size(cover), contentScale = ContentScale.Fit)
+        androidx.compose.foundation.Canvas(Modifier.size(maxWidth, maxHeight)) {
+            val c = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
+            val end = c + androidx.compose.ui.geometry.Offset(knob.x.toPx(), knob.y.toPx())
+            val w = size.width * .075f
+            drawLine(androidx.compose.ui.graphics.Color(0xFF060708), c, end, w, androidx.compose.ui.graphics.StrokeCap.Round)
+            drawLine(androidx.compose.ui.graphics.Color(0x55FFFFFF), c - androidx.compose.ui.geometry.Offset(w * .22f, 0f),
+                end - androidx.compose.ui.geometry.Offset(w * .22f, 0f), w * .18f, androidx.compose.ui.graphics.StrokeCap.Round)
+        }
+        val ball = s * .42f
+        Image(painterResource(R.drawable.saturn_stick_ball), null,
+            Modifier.offset(x = (maxWidth - ball) / 2 + knob.x, y = (maxHeight - ball) / 2 + knob.y).size(ball),
+            contentScale = ContentScale.Fit)
     }
 }

@@ -224,6 +224,10 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
                 Emulator.savePrefs()
             },
             onFastChange = { Emulator.toggleFastForward() },
+            dynamicDpad = Emulator.touchDpadMode == gb.frame.TouchDpadMode.DYNAMIC,
+            onStick = if (Emulator.analogPad) { x, y ->
+                Emulator.setTouchStick(((x + 1f) * 127.5f).toInt().coerceIn(0, 255), ((y + 1f) * 127.5f).toInt().coerceIn(0, 255))
+            } else null,
         )
     }
 }
@@ -232,13 +236,15 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
 private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions) {
     BoxWithConstraints(modifier) {
         val side = ((maxWidth - maxHeight * ratio) / 2).coerceAtLeast(0.dp)
+        val dynamicDpad = Emulator.touchDpadMode == gb.frame.TouchDpadMode.DYNAMIC
         if (Emulator.aspect == 1 || side < 100.dp) {
             // Full screen (or no room beside the picture): the same printed controls float over the game. The
             // overlay artworks keep only the controls and their labels (the body is transparent), drawn at the art's
             // own proportions and slightly see-through.
             val panelW = maxHeight * .49f
             Box(Modifier.align(Alignment.CenterStart).width(panelW).fillMaxHeight().graphicsLayer { alpha = OverlayAlpha }) {
-                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_touch_landscape_left_overlay, 1, a, overlay = true)
+                ArtworkPanel(Modifier.fillMaxSize(), if (dynamicDpad) R.drawable.saturn_touch_landscape_left_overlay_nodpad
+                    else R.drawable.saturn_touch_landscape_left_overlay, 1, a, overlay = true)
             }
             Box(Modifier.align(Alignment.CenterEnd).width(panelW).fillMaxHeight().graphicsLayer { alpha = OverlayAlpha }) {
                 ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_touch_landscape_right_overlay, 2, a, overlay = true)
@@ -246,7 +252,8 @@ private fun ArtworkLandscapePad(modifier: Modifier, ratio: Float, a: PadActions)
         } else {
             val edgeFill = Brush.verticalGradient(listOf(Color(0xFF292B31), Color(0xFF22242A), Color(0xFF292B31)))
             Box(Modifier.align(Alignment.CenterStart).width(side).fillMaxHeight().background(edgeFill)) {
-                ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_touch_landscape_left, 1, a)
+                ArtworkPanel(Modifier.fillMaxSize(), if (dynamicDpad) R.drawable.saturn_touch_landscape_left_nodpad
+                    else R.drawable.saturn_touch_landscape_left, 1, a)
             }
             Box(Modifier.align(Alignment.CenterEnd).width(side).fillMaxHeight().background(edgeFill)) {
                 ArtworkPanel(Modifier.fillMaxSize(), R.drawable.saturn_touch_landscape_right, 2, a)
@@ -353,6 +360,39 @@ private fun ArtworkPanel(modifier: Modifier, art: Int, panel: Int, a: PadActions
             button(x, y, bw, bh, "art-$panel-$key", { down -> if (down) run() }, latched)
         }
         @Composable fun directions(x: Float, y: Float, size: Float) {
+            if (panel != 0 && Emulator.touchDpadMode == gb.frame.TouchDpadMode.DYNAMIC) {
+                // Dynamic mode: the art has no printed D-pad; a touch anywhere between the SEGA logo and START places
+                // the arcade stick there and its ball follows the thumb.
+                val bezel = h * (size * sourceAspect)
+                val radius = with(androidx.compose.ui.platform.LocalDensity.current) { (bezel * (95f / 414f)).toPx() }
+                gb.frame.FloatingDPadZone(
+                    modifier = Modifier.offset(y = h * .30f).size(w, h * .53f),
+                    radiusPx = radius,
+                    hapticsEnabled = Emulator.touchHapticsEnabled,
+                    onDirections = { dirs ->
+                        TouchState.set("dpad", dirs.fold(0) { bits, direction -> bits or when (direction) {
+                            TouchDirection.UP -> SaturnButton.Up.bit
+                            TouchDirection.DOWN -> SaturnButton.Down.bit
+                            TouchDirection.LEFT -> SaturnButton.Left.bit
+                            TouchDirection.RIGHT -> SaturnButton.Right.bit
+                        } })
+                    },
+                    onVector = { v ->
+                        if (Emulator.analogPad) Emulator.setTouchStick(((v.x + 1f) * 127.5f).toInt().coerceIn(0, 255),
+                            ((v.y + 1f) * 127.5f).toInt().coerceIn(0, 255))
+                    },
+                    // Waits at the static D-pad's place until the first touch
+                    restCenter = with(androidx.compose.ui.platform.LocalDensity.current) {
+                        Offset((w * cx(x)).toPx(), (h * (y - .30f)).toPx())
+                    },
+                ) { center, knob ->
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    val c = with(density) { androidx.compose.ui.unit.DpOffset(center.x.toDp(), center.y.toDp()) }
+                    val k = with(density) { androidx.compose.ui.unit.DpOffset(knob.x.toDp(), knob.y.toDp()) }
+                    ArcadeStick(Modifier.offset(x = c.x - bezel / 2, y = c.y - bezel / 2).size(bezel), k)
+                }
+                return
+            }
             var active by remember { mutableStateOf(emptySet<TouchDirection>()) }
             val dpadSize = if (panel == 0) w * (size / crop) else h * (size * sourceAspect)
             val dx = cx(x)

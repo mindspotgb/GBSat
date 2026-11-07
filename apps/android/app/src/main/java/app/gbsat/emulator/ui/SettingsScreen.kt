@@ -88,7 +88,7 @@ fun SettingsScreen(onBack: () -> Unit, toast: (String) -> Unit, page: SettingsPa
             try {
                 val files = withContext(Dispatchers.IO) {
                     val root = requireNotNull(DocumentFile.fromTreeUri(ctx, uri)) { "Could not open BIOS folder" }
-                    root.listFiles().filter { it.isFile && it.length() == 512L * 1024 }
+                    root.listFiles().filter { it.isFile && gb.frame.BiosFiles.isBiosFileName(it.name) && it.length() == 512L * 1024 }
                 }
                 when (files.size) {
                     0 -> toast("No 512 KiB Saturn BIOS found in that folder")
@@ -133,7 +133,7 @@ fun SettingsScreen(onBack: () -> Unit, toast: (String) -> Unit, page: SettingsPa
             ) {
                 Column(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     when (current) {
-                    SettingsPage.System -> SystemPage({ biosPicker.launch(arrayOf("*/*")) }, { biosFolderPicker.launch(null) }, importingBios, {
+                    SettingsPage.System -> SystemPage({ biosPicker.launch(gb.frame.BiosFiles.pickerMimeTypes) }, { biosFolderPicker.launch(null) }, importingBios, {
                         folderPicker.launch(Emulator.gamesDir.takeIf { it.isNotBlank() }?.let(Uri::parse)
                             ?: gb.frame.StorageDefaults.treePickerUri(gb.frame.StorageDefaults.SATURN_GAMES_DIRECTORY))
                     },
