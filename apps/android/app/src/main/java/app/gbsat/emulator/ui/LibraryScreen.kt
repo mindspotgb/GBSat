@@ -4,7 +4,6 @@ import gb.frame.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,7 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -28,7 +26,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
@@ -68,6 +65,7 @@ fun LibraryScreen(
     var menuOpen by MenuState.open
     val style by HomeTheme.style
     val fullscreen by HomeTheme.fullscreen
+    val mobileState = rememberMobileLibraryState()
     val menuFocus = remember { FocusRequester() }
     val hasPad = rememberHasGamepad()
     // Menu opened: with a controller its first entry (or the page just closed) is selected, even when it was opened by a
@@ -119,7 +117,12 @@ fun LibraryScreen(
         loading = false
     }
     LaunchedEffect(refreshKey, games) {
-        val found = withContext(Dispatchers.IO) { Emulator.recentStates() }
+        val found = try {
+            withContext(Dispatchers.IO) { Emulator.recentStates() }
+        } catch (failure: SecurityException) {
+            withContext(Dispatchers.IO) { Emulator.dataFolder.checkAccess() }
+            return@LaunchedEffect
+        }
         if (found != states) states = found
     }
     val entries = remember(states) {
@@ -146,7 +149,13 @@ fun LibraryScreen(
     // B / Back (the kit's behavior, the same in every app): close what is open, from the library ask before quitting.
     // MainActivity deduplicates paired controller keycodes, so quick consecutive B presses must not be debounced.
     androidx.activity.compose.BackHandler {
-        LibraryBack.handle { if (achievementsFor != null) { achievementsFor = null; true } else false }
+        LibraryBack.handle {
+            when {
+                achievementsFor != null -> { achievementsFor = null; true }
+                !menuOpen && mobileState.page != MobileLibraryPage.Library -> { mobileState.page = MobileLibraryPage.Library; true }
+                else -> false
+            }
+        }
     }
 
     fun showLaunchLoading(action: suspend ((DiscArchiveProgress) -> Unit) -> String?) {
@@ -183,30 +192,39 @@ fun LibraryScreen(
     }
     val empty: (@Composable () -> Unit)? = if (emptyKind == null) null else ({ EmptyContent(emptyKind, toSystem) })
 
-    Box(Modifier.fillMaxSize().background(AppBackground).onFocusChanged { MenuState.hasFocus = it.hasFocus }.onPreviewKeyEvent { e ->
+    BoxWithConstraints(Modifier.fillMaxSize().background(AppBackground).onFocusChanged { MenuState.hasFocus = it.hasFocus }.onPreviewKeyEvent { e ->
         openingGame
     }.homeQuitKeys(onQuit)) {
+        val mobileLayout = maxWidth < 600.dp && maxWidth < maxHeight
         Column(Modifier.fillMaxSize().then(if (fullscreen) Modifier.padding(horizontal = 10.dp, vertical = 8.dp) else Modifier.safeDrawingPadding().padding(12.dp)),
             verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 12.dp)) {
             if (!fullscreen) HomeTopBar(rememberAppIconPainter(R.drawable.ic_launcher_foreground), "GBSat", onClick = {
                 if (!menuOpen) MenuState.selected = null
                 menuOpen = !menuOpen
-            }, menuOpen = menuOpen)
+            }, menuOpen = menuOpen, subtitle = "Saturn Emulator")
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 // SEGA Saturn logo watermark supplied for the library background.
-                Image(
-                    painter = painterResource(R.drawable.sega_saturn_logo_watermark),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.align(Alignment.Center)
-                        .fillMaxWidth(.48f)
-                        .fillMaxHeight(.72f)
-                        .alpha(.18f),
-                )
-                HomeLibrary(style, homeGames, entries, actions, coverVersion, empty,
-                    refocus = MenuState.refocus.intValue, fullscreen = fullscreen,
-                    // The open menu owns the controller; when it closes the library takes the focus back on the last selected game
-                    focusEnabled = !menuOpen)
+                if (!mobileLayout || mobileState.page != MobileLibraryPage.Library ||
+                    style != HomeStyle.Showcase || empty != null) {
+                    LibraryWatermark(
+                        painter = painterResource(R.drawable.sega_saturn_logo_watermark),
+                        modifier = Modifier.align(Alignment.Center)
+                            .fillMaxWidth(.48f)
+                            .fillMaxHeight(.72f),
+                    )
+                }
+                if (!mobileLayout) {
+                    HomeLibrary(style, homeGames, entries, actions, coverVersion, empty,
+                        refocus = MenuState.refocus.intValue, fullscreen = fullscreen,
+                        focusEnabled = !menuOpen,
+                    portraitShowcaseScreenshot = false)
+                } else {
+                    MobileLibraryContent(mobileState, style, homeGames, entries, actions, coverVersion, empty,
+                        refocus = MenuState.refocus.intValue, fullscreen = fullscreen, focusEnabled = !menuOpen,
+                        showcaseWatermark = { modifier ->
+                            LibraryWatermark(painterResource(R.drawable.sega_saturn_logo_watermark), modifier)
+                        })
+                }
                 achievementsFor?.let { path ->
                     // Drawn over the library (same window), so the controller mapping of the main window applies
                     Box(Modifier.zIndex(10f).fillMaxSize()) {
@@ -214,7 +232,12 @@ fun LibraryScreen(
                     }
                 }
             }
-            if (!fullscreen && hasPad && HomeTheme.buttonHelp.value) HomeHelpBar()
+            if (!fullscreen && mobileLayout) {
+                MobileLibraryNavigation(mobileState, onSettings = {
+                    MenuState.selected = null
+                    menuOpen = true
+                })
+            } else if (!fullscreen && hasPad && HomeTheme.buttonHelp.value) HomeHelpBar()
 
         }
         if (fullscreen && !menuOpen && !openingGame) {

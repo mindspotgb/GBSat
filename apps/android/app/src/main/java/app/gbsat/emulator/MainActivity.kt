@@ -93,11 +93,10 @@ class MainActivity : ComponentActivity() {
         android.os.Process.killProcess(android.os.Process.myPid()) // emulator state lives in the process; start clean next time
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun setImmersiveMode(on: Boolean) {
-        // The app intentionally stays immersive. Android Back is dispatched to the active Compose BackHandler.
-        // The kit keeps the bars visible on a touch-only device outside games; games hide them.
-        if (on) gb.frame.FullScreen.hideSystemBars(this, inGame = Emulator.running)
-        else gb.frame.FullScreen.showSystemBars(this)
+        // The app stays immersive on every screen. Android Back is dispatched to the active Compose BackHandler.
+        gb.frame.FullScreen.hideSystemBars(this)
     }
 
     // ---- Physical gamepad support ----

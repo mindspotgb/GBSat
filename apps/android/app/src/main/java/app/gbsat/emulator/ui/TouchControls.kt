@@ -173,6 +173,7 @@ private fun ArtworkPortraitPad(modifier: Modifier, a: PadActions) {
         marginBottom = SATURN_V12_MARGIN_BOTTOM,
         logo = painterResource(R.drawable.saturn_logo_banner),
         logoDescription = "Sega Saturn",
+        logoVerticalOffset = 5.dp,
     ) { placement ->
         SaturnControllerV12(
             modifier = placement,
