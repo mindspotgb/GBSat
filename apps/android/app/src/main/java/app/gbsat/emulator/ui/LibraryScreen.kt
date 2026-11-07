@@ -152,7 +152,7 @@ fun LibraryScreen(
         LibraryBack.handle {
             when {
                 achievementsFor != null -> { achievementsFor = null; true }
-                !menuOpen && mobileState.page != MobileLibraryPage.Library -> { mobileState.page = MobileLibraryPage.Library; true }
+                !menuOpen && mobileState.returnToLibrary() -> true
                 else -> false
             }
         }
@@ -195,7 +195,7 @@ fun LibraryScreen(
     BoxWithConstraints(Modifier.fillMaxSize().background(AppBackground).onFocusChanged { MenuState.hasFocus = it.hasFocus }.onPreviewKeyEvent { e ->
         openingGame
     }.homeQuitKeys(onQuit)) {
-        val mobileLayout = maxWidth < 600.dp && maxWidth < maxHeight
+        val mobileLayout = isMobileLibraryLayout(maxWidth, maxHeight)
         Column(Modifier.fillMaxSize().then(if (fullscreen) Modifier.padding(horizontal = 10.dp, vertical = 8.dp) else Modifier.safeDrawingPadding().padding(12.dp)),
             verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 12.dp)) {
             if (!fullscreen) HomeTopBar(rememberAppIconPainter(R.drawable.ic_launcher_foreground), "GBSat", onClick = {
