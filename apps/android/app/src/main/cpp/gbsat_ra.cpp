@@ -72,12 +72,30 @@ void PushEvent(const std::string &line) {
     }
 }
 
+// Set when Env() attached the calling thread itself (the emulation thread): it must detach before it ends, or ART
+// aborts the process ("Native thread exited without calling DetachCurrentThread") when quitting the app
+thread_local bool t_attached = false;
+
 JNIEnv *Env() {
+    if (!g_vm) return nullptr;
     JNIEnv *env = nullptr;
     if (g_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) == JNI_EDETACHED) {
-        g_vm->AttachCurrentThread(&env, nullptr);
+        if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return nullptr;
+        t_attached = true;
     }
     return env;
+}
+
+// The request could not reach Kotlin: answer it as a network failure (rc_client retries those) instead of leaving the
+// login or game load waiting forever
+void FailCall(rc_client_server_callback_t callback, void *callbackData) {
+    auto fail = [callback, callbackData] {
+        rc_api_server_response_t response{};
+        response.body = "";
+        response.http_status_code = RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR;
+        callback(&response, callbackData);
+    };
+    if (g_post) g_post(fail); // not from inside rc_client's own call
 }
 
 uint32_t RC_CCONV ReadMemory(uint32_t address, uint8_t *buffer, uint32_t numBytes, rc_client_t *) {
@@ -99,24 +117,37 @@ uint32_t RC_CCONV ReadMemory(uint32_t address, uint8_t *buffer, uint32_t numByte
 
 void RC_CCONV ServerCall(const rc_api_request_t *request, rc_client_server_callback_t callback, void *callbackData,
                          rc_client_t *) {
+    JNIEnv *env = Env();
+    if (!env || !g_bridge || !g_httpMethod) {
+        FailCall(callback, callbackData);
+        return;
+    }
     const int id = g_nextId++;
     {
         std::lock_guard lk(g_pendingMutex);
         g_pending[id] = {callback, callbackData};
     }
-    JNIEnv *env = Env();
     jstring url = env->NewStringUTF(request->url);
     jstring post = request->post_data ? env->NewStringUTF(request->post_data) : nullptr;
     jstring type = request->content_type ? env->NewStringUTF(request->content_type) : nullptr;
     jstring ua = env->NewStringUTF(g_userAgent.c_str());
     env->CallStaticVoidMethod(g_bridge, g_httpMethod, id, url, post, type, ua);
-    if (env->ExceptionCheck()) {
+    const bool failed = env->ExceptionCheck();
+    if (failed) {
         env->ExceptionClear();
     }
     env->DeleteLocalRef(url);
     if (post) env->DeleteLocalRef(post);
     if (type) env->DeleteLocalRef(type);
     env->DeleteLocalRef(ua);
+    if (failed) {
+        bool pending = false;
+        {
+            std::lock_guard lk(g_pendingMutex);
+            pending = g_pending.erase(id) != 0; // else Kotlin already answered it
+        }
+        if (pending) FailCall(callback, callbackData);
+    }
 }
 
 std::string AchievementLine(const char *kind, const rc_client_achievement_t *a) {
@@ -303,6 +334,13 @@ std::vector<uint8_t> SerializeProgress() {
         }
     }
     return out;
+}
+
+void ThreadExit() {
+    if (t_attached && g_vm) {
+        g_vm->DetachCurrentThread();
+        t_attached = false;
+    }
 }
 
 void DeserializeProgress(const std::vector<uint8_t> &data) {

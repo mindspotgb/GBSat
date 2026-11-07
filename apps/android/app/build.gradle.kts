@@ -107,8 +107,11 @@ android {
             if (gbsatKey != null) applicationIdSuffix = ".dev"
             manifestPlaceholders["appLabel"] = "GBSat Dev"
             signingConfig = signingConfigs.getByName("debug")
+            // Native code writes the perf log and PGO data to Android/media/<installed package> (gb_native.cmake)
+            externalNativeBuild { cmake { arguments += "-DGB_APP_ID_SUFFIX=.dev" } }
         }
         release {
+            externalNativeBuild { cmake { arguments += "-DGB_APP_ID_SUFFIX=${if (gbsatKey == null) ".dev" else ""}" } }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

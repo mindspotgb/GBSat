@@ -474,7 +474,9 @@ void UpdateFrameMetadata(const uint32_t *fb, uint32_t width, uint32_t height, ui
     g->presented.fetch_add(1, std::memory_order_relaxed);
     g->lastFrameOnGpu.store(!thumbnail, std::memory_order_relaxed);
     if (fb) {
-        g->skip.OnFrame(fb, width, height, stridePixels); // Skip Engine: black / still picture
+        // Skip Engine: black / still picture, only analysed while a skip option is on (the CD speed rule needs only
+        // the disc activity and the sound)
+        if (SkipEngineWantsPicture()) g->skip.OnFrame(fb, width, height, stridePixels);
         if (thumbnail) {
             std::lock_guard lk(g->lastFrameMutex);
             Downscale(fb, width, height, stridePixels, g->lastFrame, g->lastFrameW, g->lastFrameH);
@@ -1437,9 +1439,13 @@ void EmuLoop() {
             g->behind = g->ring.Fill() < g->targetFill.load() / 2;
             // Audio-driven pacing: keep ~46 ms buffered.
             // audioOk: a stream lost (device disconnected) and not reopened would never drain the buffer
-            while (g->running.load() && !g->paused.load() && g->audioOk.load() &&
-                   g->ring.Fill() > g->targetFill.load()) {
-                std::this_thread::sleep_for(microseconds(500));
+            // Sleeps about as long as the excess takes to play (at most 4 ms, so pause/quit stay quick) instead of
+            // polling every 0.5 ms: ~30 wakeups per frame on a single fast core kept it out of its idle states
+            for (uint32_t fill = g->ring.Fill(), target = g->targetFill.load();
+                 g->running.load() && !g->paused.load() && g->audioOk.load() && fill > target;
+                 fill = g->ring.Fill(), target = g->targetFill.load()) {
+                const int64_t us = (int64_t)(fill - target) * 1000000 / kSampleRate;
+                std::this_thread::sleep_for(microseconds(std::clamp<int64_t>(us, 250, 4000)));
             }
         } else {
             const bool pal = g->saturn->GetVideoStandard() == ymir::core::config::sys::VideoStandard::PAL;
@@ -1453,6 +1459,7 @@ void EmuLoop() {
             }
         }
     }
+    ra::ThreadExit();
 }
 
 std::string JStr(JNIEnv *env, jstring s) {
@@ -1467,6 +1474,37 @@ std::string JStr(JNIEnv *env, jstring s) {
 
 jstring NewJStr(JNIEnv *env, const std::string &s) {
     return s.empty() ? nullptr : env->NewStringUTF(s.c_str());
+}
+
+// A disc's identity from sector 0 of its first track: the RetroAchievements hash (MD5 of the first 512 bytes: volume and
+// ROM headers) and the IP.BIN header (first 256 bytes, printable ASCII). Both empty when the sector can't be read.
+struct DiscIdentity {
+    std::string raHash, header;
+};
+DiscIdentity ReadDiscIdentity(const ymir::media::Disc &disc) {
+    DiscIdentity id;
+    if (disc.sessions.empty()) {
+        return id;
+    }
+    const auto &session = disc.sessions.front();
+    const auto &track = session.tracks[session.firstTrackIndex];
+    std::array<uint8_t, 2048> sector{};
+    if (!track.ReadSectorUserData(track.startFrameAddress, sector)) {
+        return id;
+    }
+    md5_state_t md5;
+    md5_byte_t digest[16];
+    md5_init(&md5);
+    md5_append(&md5, sector.data(), 512);
+    md5_finish(&md5, digest);
+    char hex[33];
+    for (int i = 0; i < 16; ++i) snprintf(hex + i * 2, 3, "%02x", digest[i]);
+    id.raHash = hex;
+    id.header.assign(reinterpret_cast<const char *>(sector.data()), 256);
+    for (char &c : id.header) {
+        if (c < 0x20 || c > 0x7E) c = ' ';
+    }
+    return id;
 }
 
 } // namespace
@@ -1664,48 +1702,26 @@ JNI_FN(jstring, nativeLoadDisc)(JNIEnv *env, jclass, jstring path) {
     if (!ok) {
         return NewJStr(env, log.empty() ? "Failed to load disc image" : log);
     }
-    // RetroAchievements hash: MD5 of the first 512 bytes of sector 0 of track 1 (volume + ROM headers)
-    std::string raHash;
-    if (!disc->sessions.empty()) {
-        const auto &session = disc->sessions.front();
-        const auto &track = session.tracks[session.firstTrackIndex];
-        std::array<uint8_t, 2048> sector{};
-        if (track.ReadSectorUserData(track.startFrameAddress, sector)) {
-            md5_state_t md5;
-            md5_byte_t digest[16];
-            md5_init(&md5);
-            md5_append(&md5, sector.data(), 512);
-            md5_finish(&md5, digest);
-            char hex[33];
-            for (int i = 0; i < 16; ++i) snprintf(hex + i * 2, 3, "%02x", digest[i]);
-            raHash = hex;
-            std::string hdr(reinterpret_cast<const char *>(sector.data()), 256);
-            for (char &c : hdr) {
-                if (c < 0x20 || c > 0x7E) c = ' ';
-            }
-            {
-                std::lock_guard lk(g->winMutex);
-                g->discHeader = hdr;
-            }
-            // The loaded game's title in the log: tools/profile.bat names its reports after it (reading the performance
-            // log from the shell could return a stale copy, so the previous game's name)
-            std::string title = hdr.substr(0x60, 112);
-            title.erase(title.find_last_not_of(' ') + 1);
-            std::string code = hdr.substr(0x20, 10);
-            code.erase(code.find_last_not_of(' ') + 1);
-            LOGI("Game: %s (%s)", title.c_str(), code.c_str());
-        }
+    const DiscIdentity id = ReadDiscIdentity(*disc);
+    const std::string &raHash = id.raHash;
+    {
+        // Always replaced: a disc whose header can't be read kept the previous game's, so its title in the log and
+        // its cartridge (product code below) came from the game played before
+        std::lock_guard lk(g->winMutex);
+        g->discHeader = id.header;
     }
     // Cartridge from the game database (adapted from Mednafen): the RAM cartridge for the games that need one (1, 4 or
     // 6 MiB), the KOF95/Ultraman ROM carts when their dumps are in <data>/carts/, otherwise a 4 MiB backup memory
     // cartridge (saves/cartridge_backup.bin) for games that save to (or ask for) a save cartridge.
     std::string productCode;
-    {
-        std::lock_guard lk(g->winMutex);
-        if (g->discHeader.size() >= 0x2A) {
-            productCode = g->discHeader.substr(0x20, 10);
-            productCode.erase(productCode.find_last_not_of(' ') + 1);
-        }
+    if (!id.header.empty()) {
+        // The loaded game's title in the log: tools/profile.bat names its reports after it (reading the performance
+        // log from the shell could return a stale copy, so the previous game's name)
+        std::string title = id.header.substr(0x60, 112);
+        title.erase(title.find_last_not_of(' ') + 1);
+        productCode = id.header.substr(0x20, 10);
+        productCode.erase(productCode.find_last_not_of(' ') + 1);
+        LOGI("Game: %s (%s)", title.c_str(), productCode.c_str());
     }
     RunSync([disc, raHash, productCode]() -> int {
         using ymir::db::Cartridge;
@@ -1792,29 +1808,8 @@ JNI_FN(jstring, nativeSwapDisc)(JNIEnv *env, jclass, jstring path) {
     }
 
     // Keep the machine running: only replace CD media and refresh per-disc identity/achievements.
-    std::string raHash;
-    std::string header;
-    if (!disc->sessions.empty()) {
-        const auto &session = disc->sessions.front();
-        const auto &track = session.tracks[session.firstTrackIndex];
-        std::array<uint8_t, 2048> sector{};
-        if (track.ReadSectorUserData(track.startFrameAddress, sector)) {
-            md5_state_t md5;
-            md5_byte_t digest[16];
-            md5_init(&md5);
-            md5_append(&md5, sector.data(), 512);
-            md5_finish(&md5, digest);
-            char hex[33];
-            for (int i = 0; i < 16; ++i) snprintf(hex + i * 2, 3, "%02x", digest[i]);
-            raHash = hex;
-            header.assign(reinterpret_cast<const char *>(sector.data()), 256);
-            for (char &c : header) {
-                if (c < 0x20 || c > 0x7E) c = ' ';
-            }
-        }
-    }
-
-    RunSync([disc, raHash, header]() -> int {
+    DiscIdentity id = ReadDiscIdentity(*disc);
+    RunSync([disc, raHash = std::move(id.raHash), header = std::move(id.header)]() -> int {
         g->saturn->OpenTray();
         g->saturn->EjectDisc();
         g->saturn->LoadDisc(std::move(*disc));
@@ -2318,24 +2313,11 @@ JNI_FN(jfloat, nativeGetGpuLoad)(JNIEnv *, jclass) {
 
 // RetroAchievements hash of a disc image that is not running (same rule as nativeLoadDisc), for the game's achievement list.
 JNI_FN(jstring, nativeRaHashFile)(JNIEnv *env, jclass, jstring path) {
-    auto disc = std::make_shared<ymir::media::Disc>();
-    if (!ymir::media::LoadDisc(JStr(env, path), *disc, [](ymir::media::MessageType, std::string) {}) || disc->sessions.empty()) {
+    ymir::media::Disc disc;
+    if (!ymir::media::LoadDisc(JStr(env, path), disc, [](ymir::media::MessageType, std::string) {})) {
         return nullptr;
     }
-    const auto &session = disc->sessions.front();
-    const auto &track = session.tracks[session.firstTrackIndex];
-    std::array<uint8_t, 2048> sector{};
-    if (!track.ReadSectorUserData(track.startFrameAddress, sector)) {
-        return nullptr;
-    }
-    md5_state_t md5;
-    md5_byte_t digest[16];
-    md5_init(&md5);
-    md5_append(&md5, sector.data(), 512);
-    md5_finish(&md5, digest);
-    char hex[33];
-    for (int i = 0; i < 16; ++i) snprintf(hex + i * 2, 3, "%02x", digest[i]);
-    return env->NewStringUTF(hex);
+    return NewJStr(env, ReadDiscIdentity(disc).raHash);
 }
 
 JNI_FN(jbyteArray, nativeRaAchievements)(JNIEnv *env, jclass) {

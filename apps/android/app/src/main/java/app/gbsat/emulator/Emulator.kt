@@ -802,22 +802,27 @@ object Emulator {
     // ---- Input merging: touch + gamepad each own a mask; native sees the OR. ----
     private var touchMask = 0
     private var padMask = 0
-    private var touchStick = intArrayOf(0x80, 0x80)
-    private var padStick = intArrayOf(0x80, 0x80)
-    private var trig = intArrayOf(0, 0)
+    // Plain fields: a controller sends motion events at up to a few hundred per second, and a new array for each one
+    // was garbage for the collector during gameplay
+    private var touchStickX = 0x80
+    private var touchStickY = 0x80
+    private var padStickX = 0x80
+    private var padStickY = 0x80
+    private var trigL = 0
+    private var trigR = 0
 
     private fun pushButtons() = NativeBridge.nativeSetButtons(touchMask or padMask)
     fun setTouchMask(m: Int) { touchMask = m; pushButtons() }
     fun setPadMask(m: Int) { padMask = m; pushButtons(); pushAnalog() }
-    fun setPadStick(x: Int, y: Int) { padStick = intArrayOf(x, y); pushAnalog() }
-    fun setTouchStick(x: Int, y: Int) { touchStick = intArrayOf(x, y); pushAnalog() }
-    fun setTriggers(l: Int, r: Int) { trig = intArrayOf(l, r); pushAnalog() }
+    fun setPadStick(x: Int, y: Int) { padStickX = x; padStickY = y; pushAnalog() }
+    fun setTouchStick(x: Int, y: Int) { touchStickX = x; touchStickY = y; pushAnalog() }
+    fun setTriggers(l: Int, r: Int) { trigL = l; trigR = r; pushAnalog() }
     private fun pushAnalog() {
-        val x = if (padStick[0] != 0x80) padStick[0] else touchStick[0]
-        val y = if (padStick[1] != 0x80) padStick[1] else touchStick[1]
+        val x = if (padStickX != 0x80) padStickX else touchStickX
+        val y = if (padStickY != 0x80) padStickY else touchStickY
         val m = touchMask or padMask
-        val l = maxOf(trig[0], if (m and SaturnButton.L.bit != 0) 255 else 0)
-        val r = maxOf(trig[1], if (m and SaturnButton.R.bit != 0) 255 else 0)
+        val l = maxOf(trigL, if (m and SaturnButton.L.bit != 0) 255 else 0)
+        val r = maxOf(trigR, if (m and SaturnButton.R.bit != 0) 255 else 0)
         NativeBridge.nativeSetAnalog(x, y, l, r)
     }
 }

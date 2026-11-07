@@ -22,5 +22,7 @@ bool IsHardcore();
 std::vector<uint8_t> SerializeProgress();
 void DeserializeProgress(const std::vector<uint8_t> &data);
 std::string AchievementList();
+// Last call of the emulation thread: detaches it from the JVM if RetroAchievements attached it (HTTP requests)
+void ThreadExit();
 
 } // namespace ra
